@@ -1,15 +1,33 @@
 'use strict';
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const archiver = require('archiver');
 const logger = require('./src/logger');
+const { logBuffer } = require('./src/logger');
 const Orchestrator = require('./orchestrator');
 
 const orchestrator = new Orchestrator();
 const app = express();
 const PORT = parseInt(process.env.PORT) || 3131;
+
+// ── Authentifizierungs-Middleware (optional) ──────────────────
+function authMiddleware(req, res, next) {
+  const token = process.env.API_TOKEN;
+  if (!token) return next(); // Keine Auth konfiguriert → alles erlaubt
+
+  const authHeader = req.headers.authorization || '';
+  const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
+  // Timing-safe Vergleich gegen Timing-Angriffe
+  if (!provided || provided.length !== token.length ||
+      !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(token))) {
+    return res.status(401).json({ error: 'Authentifizierung erforderlich' });
+  }
+  next();
+}
 
 // ── CORS auf localhost beschränken ───────────────────────────
 app.use(cors({
@@ -128,7 +146,7 @@ let isStarting = false;
 // ── REST API ─────────────────────────────────────────────────
 
 // Projekt starten (mit Input-Validierung + Race-Condition Fix)
-app.post('/api/start', startLimiter, async (req, res) => {
+app.post('/api/start', authMiddleware, startLimiter, async (req, res) => {
   if (isStarting || orchestrator.phase === 'running' || orchestrator.phase === 'awaiting_approval') {
     return res.status(409).json({ error: 'Projekt läuft bereits' });
   }
@@ -173,7 +191,7 @@ app.get('/api/status', (req, res) => {
 });
 
 // Projekt zurücksetzen
-app.post('/api/reset', apiLimiter, (req, res) => {
+app.post('/api/reset', authMiddleware, apiLimiter, (req, res) => {
   orchestrator.reset();
   isStarting = false;
   broadcast('state', orchestrator.getState());
@@ -199,6 +217,16 @@ app.get('/health', (req, res) => {
     phase: orchestrator.phase,
     memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
   });
+});
+
+// ── Log-Viewer API ──────────────────────────────────────────
+app.get('/api/logs', (req, res) => {
+  const level = req.query.level;
+  let entries = logBuffer.slice().reverse(); // newest first
+  if (level) {
+    entries = entries.filter(e => e.level === level);
+  }
+  res.json(entries.slice(0, 100));
 });
 
 // ── Projekt-Historie ─────────────────────────────────────────
@@ -246,7 +274,7 @@ app.get('/api/projects/:id', (req, res) => {
 });
 
 // ── Projekt löschen ─────────────────────────────────────────
-app.delete('/api/projects/:id', apiLimiter, (req, res) => {
+app.delete('/api/projects/:id', authMiddleware, apiLimiter, (req, res) => {
   const id = req.params.id;
   if (!id.startsWith('proj_')) {
     return res.status(400).json({ error: 'Ungültige Projekt-ID' });
@@ -270,7 +298,7 @@ app.delete('/api/projects/:id', apiLimiter, (req, res) => {
 });
 
 // ── Alte Projekte aufräumen ─────────────────────────────────
-app.post('/api/cleanup', apiLimiter, (req, res) => {
+app.post('/api/cleanup', authMiddleware, apiLimiter, (req, res) => {
   const dir = path.join(__dirname, 'projects');
   if (!fs.existsSync(dir)) return res.json({ ok: true, deleted: [], count: 0 });
 
@@ -470,7 +498,7 @@ app.get('/api/merged/:id', (req, res) => {
 });
 
 // ── Plan Genehmigung ─────────────────────────────────────────
-app.post('/api/approve', apiLimiter, (req, res) => {
+app.post('/api/approve', authMiddleware, apiLimiter, (req, res) => {
   try {
     orchestrator.approvePlan();
     res.json({ ok: true });
@@ -479,7 +507,7 @@ app.post('/api/approve', apiLimiter, (req, res) => {
   }
 });
 
-app.post('/api/modify-plan', apiLimiter, (req, res) => {
+app.post('/api/modify-plan', authMiddleware, apiLimiter, (req, res) => {
   try {
     const { tasks } = req.body;
     if (!Array.isArray(tasks) || tasks.length === 0) {
@@ -497,7 +525,7 @@ app.get('/api/config', (req, res) => {
   res.json(orchestrator.getConfig());
 });
 
-app.post('/api/config', apiLimiter, (req, res) => {
+app.post('/api/config', authMiddleware, apiLimiter, (req, res) => {
   try {
     orchestrator.updateConfig(req.body);
     res.json({ ok: true, config: orchestrator.getConfig() });
@@ -507,7 +535,7 @@ app.post('/api/config', apiLimiter, (req, res) => {
 });
 
 // ── Agent Retry ──────────────────────────────────────────────
-app.post('/api/retry/:agentIndex', apiLimiter, async (req, res) => {
+app.post('/api/retry/:agentIndex', authMiddleware, apiLimiter, async (req, res) => {
   const idx = parseInt(req.params.agentIndex);
   if (isNaN(idx) || idx < 0) {
     return res.status(400).json({ error: 'Ungültiger Index' });
@@ -517,7 +545,7 @@ app.post('/api/retry/:agentIndex', apiLimiter, async (req, res) => {
 });
 
 // ── Projekt klonen (Einstellungen übernehmen) ────────────────
-app.post('/api/clone/:id', apiLimiter, (req, res) => {
+app.post('/api/clone/:id', authMiddleware, apiLimiter, (req, res) => {
   const id = req.params.id;
   if (!id || !id.startsWith('proj_')) {
     return res.status(400).json({ error: 'Ungültige Projekt-ID' });

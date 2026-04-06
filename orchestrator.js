@@ -449,6 +449,7 @@ class Orchestrator extends EventEmitter {
     this.completedAt = null;
     this.totalDuration = null;
     this._approvalResolver = null;
+    this._messageBoard = new Map(); // Inter-Agent Nachrichten: agentIndex → [{from, text}]
   }
 
   emit(event, data) {
@@ -895,23 +896,56 @@ Regeln:
 2. Wenn du eine Klärung vom Koordinator brauchst: schreibe EXAKT "FRAGE: [deine genaue Frage]" und STOPPE SOFORT danach – schreibe NICHTS mehr nach der Frage
 3. Maximal 2 Fragen erlaubt – nutze sie sinnvoll
 4. Wenn du fertig bist: schreibe am Ende EXAKT "FERTIG" als letztes Wort
-5. Schreibe NIEMALS "FRAGE:" und "FERTIG" in der gleichen Antwort`;
+5. Schreibe NIEMALS "FRAGE:" und "FERTIG" in der gleichen Antwort
+6. Um einem anderen Agenten eine Nachricht zu senden: "NACHRICHT AN Agent X: [deine Nachricht]"`;
 
     for (let round = 0; round < CONFIG.maxRounds; round++) {
       this._checkAborted();
       const roundProgress = Math.min(90, Math.round(((round + 1) / CONFIG.maxRounds) * 80 + 10));
       this._patchAgent(idx, { rounds: round + 1, progress: roundProgress });
 
+      // Inter-Agent Nachrichten injizieren
+      let messageBoardText = '';
+      const pendingMessages = this._messageBoard.get(idx);
+      if (pendingMessages && pendingMessages.length > 0) {
+        messageBoardText = '\n\nNachrichten von anderen Agenten:\n' +
+          pendingMessages.map(m => `- Agent ${m.from + 1}: "${m.text}"`).join('\n') + '\n';
+        this._messageBoard.delete(idx);
+      }
+
       const trimmedHistory = trimHistory(historyText);
       const fullPrompt = trimmedHistory
-        ? `${agentSystemPrompt}\n\n## Bisheriger Verlauf:\n${trimmedHistory}\n\n## Nächster Schritt:\nFahre fort.`
-        : `${agentSystemPrompt}\n\nStarte jetzt deine Aufgabe.`;
+        ? `${agentSystemPrompt}${messageBoardText}\n\n## Bisheriger Verlauf:\n${trimmedHistory}\n\n## Nächster Schritt:\nFahre fort.`
+        : `${agentSystemPrompt}${messageBoardText}\n\nStarte jetzt deine Aufgabe.`;
 
       this._streamingAgentIdx = idx;
       const response = await runClaude(fullPrompt, agentDir, this, this._activeProcesses, this._abortController.signal);
       this._streamingAgentIdx = undefined;
 
       this._checkAborted();
+
+      // Inter-Agent Nachrichten erkennen
+      const msgRegex = /NACHRICHT AN Agent (\d+):\s*(.+?)(?:\n|$)/gi;
+      let msgMatch;
+      while ((msgMatch = msgRegex.exec(response)) !== null) {
+        const targetIdx = parseInt(msgMatch[1]) - 1; // 1-basiert → 0-basiert
+        const msgText = msgMatch[2].trim();
+        if (targetIdx >= 0 && targetIdx < this.tasks.length && targetIdx !== idx && msgText) {
+          // Max 3 Nachrichten pro Ziel-Agent
+          if (!this._messageBoard.has(targetIdx)) {
+            this._messageBoard.set(targetIdx, []);
+          }
+          const inbox = this._messageBoard.get(targetIdx);
+          if (inbox.length < 3) {
+            inbox.push({ from: idx, text: msgText });
+            logger.info('Inter-Agent Nachricht', { from: idx + 1, to: targetIdx + 1, text: msgText.slice(0, 100) });
+            this.emit('agent_message', { from: idx, to: targetIdx, text: msgText });
+            this._addAgentMsg(idx, { from: 'message', text: `→ Agent ${targetIdx + 1}: ${msgText}`, type: 'message', targetAgent: targetIdx });
+          } else {
+            logger.warn('Inter-Agent Nachricht abgelehnt (Limit)', { from: idx + 1, to: targetIdx + 1 });
+          }
+        }
+      }
 
       const qMatch = response.match(/FRAGE:\s*(.+?)(?:\n|$)/i);
       const isDone = /FERTIG/i.test(response);

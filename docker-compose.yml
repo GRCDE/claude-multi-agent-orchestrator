@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  orchestrator:
+    build: .
+    ports:
+      - "${PORT:-3131}:3131"
+    volumes:
+      - ./projects:/app/projects
+      - /var/run/docker.sock:/var/run/docker.sock  # für zukünftige Agent-Isolation
+    env_file: .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3131/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

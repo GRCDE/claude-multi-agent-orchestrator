@@ -8,7 +8,7 @@
   /* ── Light Theme (Default) ─────────────────────────────── */
   :root {
     --bg: #ffffff; --bg2: #f5f5f3; --bg3: #eeecea;
-    --txt: #1a1a18; --txt2: #6b6b68; --txt3: #999994;
+    --txt: #1a1a18; --txt2: #6b6b68; --txt3: #757572;
     --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
     --radius: 12px; --radius-sm: 8px;
     --blue-bg: #e6f1fb; --blue: #185FA5; --blue-dark: #0C447C;
@@ -28,7 +28,7 @@
   /* ── Dark Theme ────────────────────────────────────────── */
   [data-theme="dark"] {
     --bg: #1c1c1a; --bg2: #252523; --bg3: #2e2e2b;
-    --txt: #e8e8e4; --txt2: #9a9a96; --txt3: #6b6b68;
+    --txt: #e8e8e4; --txt2: #9a9a96; --txt3: #878784;
     --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
     --blue-bg: #0c447c; --blue: #85b7eb; --blue-dark: #b5d4f4;
     --teal-bg: #085041; --teal: #9FE1CB;
@@ -39,6 +39,15 @@
     --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
   }
+
+  /* ── Accessibility ─────────────────────────────────────── */
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; white-space: nowrap; }
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .btn-icon:focus-visible, .btn-primary:focus-visible, .btn-outline:focus-visible,
+  .btn-retry:focus-visible, .top-btn:focus-visible, .filter-btn:focus-visible,
+  .template-card:focus-visible, .history-item:focus-visible,
+  .file-tree-toggle:focus-visible, .file-group-header:focus-visible,
+  .modal-close:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: var(--font); background: var(--bg); color: var(--txt); font-size: 14px; line-height: 1.5; transition: background var(--transition), color var(--transition); }
@@ -154,6 +163,8 @@
   .bubble-agent { background: var(--bg3); color: var(--txt2); }
   .bubble-question { background: var(--amber-bg); color: var(--amber-dark); }
   .bubble-coordinator { background: var(--blue-bg); color: var(--blue-dark); }
+  .bubble-message { background: var(--purple-bg); color: var(--purple); }
+  .bubble-message .bubble-label { color: var(--purple); opacity: 0.8; }
   .bubble-empty { font-size: 11.5px; color: var(--txt3); font-style: italic; }
   .bubble .copy-btn { position: absolute; top: 3px; right: 3px; background: none; border: none; cursor: pointer;
     font-size: 12px; opacity: 0; transition: opacity 0.15s; color: inherit; padding: 2px 4px; border-radius: 3px; }
@@ -463,6 +474,52 @@
     .complete-banner { flex-wrap: wrap; }
   }
 
+  /* ── Log-Viewer ──────────────────────────────────────────── */
+  .log-viewer {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    animation: modal-fadein 0.2s ease;
+  }
+  .log-viewer-panel {
+    background: var(--bg); border: 0.5px solid var(--border);
+    border-radius: var(--radius); max-width: 700px; width: 95%;
+    max-height: 80vh; display: flex; flex-direction: column;
+    box-shadow: var(--shadow-md); animation: fadein 0.2s ease;
+    padding: 1.25rem;
+  }
+  .log-viewer-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .log-viewer-title { font-size: 15px; font-weight: 600; }
+  .log-filter-row { display: flex; gap: 6px; margin-bottom: 10px; align-items: center; }
+  .log-filter-btn {
+    padding: 4px 10px; font-size: 11px; border-radius: 99px;
+    border: 0.5px solid var(--border); background: var(--bg2); color: var(--txt2);
+    cursor: pointer; transition: all var(--transition);
+  }
+  .log-filter-btn:hover { background: var(--bg3); }
+  .log-filter-btn.active { background: var(--blue-bg); color: var(--blue); border-color: var(--blue); }
+  .log-entries {
+    flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;
+    max-height: 60vh; font-size: 12px; font-family: var(--mono);
+  }
+  .log-entry {
+    padding: 4px 8px; border-radius: 4px; line-height: 1.5;
+    display: flex; gap: 8px; align-items: baseline;
+  }
+  .log-entry:hover { background: var(--bg2); }
+  .log-ts { color: var(--txt3); flex-shrink: 0; font-size: 11px; }
+  .log-lvl { flex-shrink: 0; font-size: 10px; font-weight: 600; text-transform: uppercase; min-width: 40px; }
+  .log-msg { flex: 1; word-break: break-word; color: var(--txt); }
+  .log-error .log-lvl { color: var(--red); }
+  .log-error .log-msg { color: var(--red); }
+  .log-warn .log-lvl { color: var(--amber); }
+  .log-warn .log-msg { color: var(--amber); }
+  .log-info .log-lvl { color: var(--txt2); }
+  .log-empty { color: var(--txt3); font-style: italic; padding: 1rem; text-align: center; font-size: 12px; }
+
   /* ── Druckansicht ───────────────────────────────────────── */
   @media print {
     .theme-toggle, .top-controls, .conn-bar, .btn-primary, .btn-outline, .btn-retry,
@@ -475,13 +532,15 @@
 </style>
 </head>
 <body>
-<div class="conn-bar" id="connBar"></div>
+<div class="conn-bar" id="connBar" role="status" aria-live="assertive"></div>
 <div class="top-controls">
-  <button class="top-btn" id="settingsToggle" onclick="openSettings()" title="Einstellungen">&#9881;</button>
-  <button class="top-btn" id="soundToggle" onclick="toggleSound()" title="Benachrichtigungston ein/aus"></button>
-  <button class="top-btn" id="themeToggle" onclick="toggleDarkMode()" title="Dark/Light Mode"></button>
+  <button class="top-btn" id="settingsToggle" onclick="openSettings()" title="Einstellungen" aria-label="Einstellungen"><span aria-hidden="true">&#9881;</span><span class="sr-only">Einstellungen</span></button>
+  <button class="top-btn" id="soundToggle" onclick="toggleSound()" title="Benachrichtigungston ein/aus" aria-label="Benachrichtigungston ein/aus"></button>
+  <button class="top-btn" id="themeToggle" onclick="toggleDarkMode()" title="Dark/Light Mode" aria-label="Dark/Light Mode umschalten"></button>
+  <button class="top-btn" id="logToggle" onclick="openLogViewer()" title="Server-Logs" aria-label="Server-Logs anzeigen">&#128203;</button>
 </div>
-<div id="app"></div>
+<div id="app" role="main"></div>
+<div id="a11yAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 // ── XSS Schutz ───────────────────────────────────────────────
@@ -513,13 +572,51 @@ let agentSearch = '';
 let compareMode = false;
 let compareSelected = []; // array of project IDs (max 2)
 
+// ── API-Token Authentifizierung ─────────────────────────────
+function getApiToken() {
+  return localStorage.getItem('apiToken') || '';
+}
+
+function setApiToken(token) {
+  if (token) {
+    localStorage.setItem('apiToken', token);
+  } else {
+    localStorage.removeItem('apiToken');
+  }
+}
+
+function authHeaders() {
+  var token = getApiToken();
+  var headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  return headers;
+}
+
+function authHeadersNoBody() {
+  var token = getApiToken();
+  var headers = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  return headers;
+}
+
+// Wrapper für fetch: bei 401 automatisch Banner anzeigen
+function authFetch(url, options) {
+  options = options || {};
+  return fetch(url, options).then(function(r) {
+    if (r.status === 401) {
+      addBanner('error', 'Authentifizierung fehlgeschlagen. Bitte API-Token in den Einstellungen setzen.');
+    }
+    return r;
+  });
+}
+
 // ── Dark Mode ────────────────────────────────────────────────
 let darkMode = localStorage.getItem('darkMode') !== 'false' &&
   (localStorage.getItem('darkMode') === 'true' || window.matchMedia('(prefers-color-scheme: dark)').matches);
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-  document.getElementById('themeToggle').textContent = darkMode ? '\u2600\uFE0F' : '\uD83C\uDF19';
+  var _ttEl = document.getElementById('themeToggle'); _ttEl.setAttribute('aria-label', darkMode ? 'Zum hellen Modus wechseln' : 'Zum dunklen Modus wechseln'); _ttEl.textContent = darkMode ? '\u2600\uFE0F' : '\uD83C\uDF19';
 }
 
 function toggleDarkMode() {
@@ -534,7 +631,7 @@ applyTheme();
 let soundEnabled = localStorage.getItem('soundEnabled') === 'true';
 
 function applySoundToggle() {
-  document.getElementById('soundToggle').textContent = soundEnabled ? '\uD83D\uDD14' : '\uD83D\uDD15';
+  var _stEl = document.getElementById('soundToggle'); _stEl.setAttribute('aria-label', soundEnabled ? 'Benachrichtigungston ausschalten' : 'Benachrichtigungston einschalten'); _stEl.textContent = soundEnabled ? '\uD83D\uDD14' : '\uD83D\uDD15';
 }
 
 function toggleSound() {
@@ -675,6 +772,8 @@ function connect() {
       state._successCount = d.successCount;
       state._failedCount = d.failedCount;
     }
+    // Barrierefreiheit: Phasenwechsel ansagen
+    announcePhase(d.phase);
     // Notifications
     if (d.phase === 'complete') {
       var agentCount = (state.agents || []).length;
@@ -777,6 +876,19 @@ function connect() {
     appendMessage(idx, msg);
   });
 
+  es.addEventListener('agent_message', function(e) {
+    var data = JSON.parse(e.data);
+    var from = data.from;
+    var to = data.to;
+    var text = data.text;
+    // Nachricht beim Ziel-Agenten als eingehende Nachricht anzeigen
+    var inMsg = { from: 'message', text: 'Von Agent ' + (from + 1) + ': ' + text, type: 'message', sourceAgent: from };
+    if (state.agents[to]) {
+      state.agents[to].conversation.push(inMsg);
+    }
+    appendMessage(to, inMsg);
+  });
+
   es.addEventListener('rate_limit', function(e) {
     var d = JSON.parse(e.data);
     var text = 'Claude API \u00FCberlastet, warte ' + (d.waitSeconds || '?') + 's\u2026 (Versuch ' + (d.attempt || '?') + '/' + (d.maxAttempts || 5) + ')';
@@ -847,9 +959,9 @@ function renderBanners() {
   if (!container) return;
   container.innerHTML = banners.map(function(b) {
     var cls = b.type === 'warn' ? 'banner-warn' : 'banner-error';
-    return '<div class="banner ' + cls + '">' +
+    return '<div class="banner ' + cls + '" role="alert">' +
       '<span>' + esc(b.text) + '</span>' +
-      '<button class="dismiss" onclick="dismissBanner(' + b.id + ')">\u00D7</button>' +
+      '<button class="dismiss" onclick="dismissBanner(' + b.id + ')" aria-label="Meldung schlie\u00DFen">\u00D7</button>' +
     '</div>';
   }).join('');
 }
@@ -876,9 +988,9 @@ function badge(s) {
   var entry = BADGE_MAP[s] || BADGE_MAP.idle;
   var label = entry[0], bg = entry[1], color = entry[2], spinning = entry[3];
   var indicator = spinning
-    ? '<span class="spinner spin" style="border:1.5px solid ' + color + '33;border-top-color:' + color + '"></span>'
-    : '<span class="dot" style="background:' + color + '"></span>';
-  return '<span class="badge" style="background:' + bg + ';color:' + color + '">' + indicator + esc(label) + '</span>';
+    ? '<span class="spinner spin" aria-hidden="true" style="border:1.5px solid ' + color + '33;border-top-color:' + color + '"></span>'
+    : '<span class="dot" aria-hidden="true" style="background:' + color + '"></span>';
+  return '<span class="badge" role="status" style="background:' + bg + ';color:' + color + '">' + indicator + esc(label) + '</span>';
 }
 
 function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '\u2026' : (s || ''); }
@@ -1089,7 +1201,7 @@ function renderApproval() {
 
 async function approvePlan() {
   try {
-    var r = await fetch('/api/approve', { method: 'POST' });
+    var r = await authFetch('/api/approve', { method: 'POST', headers: authHeadersNoBody() });
     if (!r.ok) {
       var d = await r.json();
       addBanner('error', d.error || 'Genehmigung fehlgeschlagen');
@@ -1119,9 +1231,9 @@ async function modifyAndApprove() {
     }
   }
   try {
-    var r = await fetch('/api/modify-plan', {
+    var r = await authFetch('/api/modify-plan', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ tasks: tasks })
     });
     if (!r.ok) {
@@ -1312,7 +1424,7 @@ function renderDashboard() {
   html += '<div>' +
     '<div class="section-label">Dateien</div>' +
     '<div class="card card-sm">' +
-      '<button class="file-tree-toggle" onclick="toggleFileTree()">' +
+      '<button class="file-tree-toggle" onclick="toggleFileTree()" aria-expanded="' + (fileTreeOpen ? 'true' : 'false') + '">' +
         '<span class="arrow" id="fileTreeArrow">\u25B6</span> Dateibaum anzeigen' +
       '</button>' +
       '<div class="file-tree" id="fileTreeContent" style="display:none"></div>' +
@@ -1353,10 +1465,14 @@ function renderCoordinatorInner(c) {
 }
 
 function renderBubble(m) {
-  var copyBtn = '<button class="copy-btn" onclick="copyText(this)" title="Kopieren">\u2398</button>';
+  var copyBtn = '<button class="copy-btn" onclick="copyText(this)" title="Kopieren" aria-label="Text kopieren">\u2398</button>';
   if (m.from === 'coordinator') {
     return '<div class="bubble-wrap right fadein"><div class="bubble bubble-coordinator">' + copyBtn +
       '<div class="bubble-label">Koordinator \u2192</div><div class="bubble-text">' + esc(truncate(m.text, 300)) + '</div></div></div>';
+  } else if (m.type === 'message') {
+    var label = m.targetAgent != null ? '\u2192 Agent ' + (m.targetAgent + 1) : (m.sourceAgent != null ? '\u2190 Agent ' + (m.sourceAgent + 1) : 'Nachricht');
+    return '<div class="bubble-wrap fadein"><div class="bubble bubble-message">' + copyBtn +
+      '<div class="bubble-label">' + esc(label) + '</div><div class="bubble-text">' + esc(truncate(m.text, 300)) + '</div></div></div>';
   } else if (m.type === 'question') {
     return '<div class="bubble-wrap fadein"><div class="bubble bubble-question">' + copyBtn +
       '<div class="bubble-label">Frage \u2192</div><div class="bubble-text">' + esc(truncate(m.text, 200)) + '</div></div></div>';
@@ -1367,10 +1483,14 @@ function renderBubble(m) {
 }
 
 function renderBubbleFull(m) {
-  var copyBtn = '<button class="copy-btn" onclick="copyText(this)" title="Kopieren">\u2398</button>';
+  var copyBtn = '<button class="copy-btn" onclick="copyText(this)" title="Kopieren" aria-label="Text kopieren">\u2398</button>';
   if (m.from === 'coordinator') {
     return '<div class="bubble-wrap right"><div class="bubble bubble-coordinator">' + copyBtn +
       '<div class="bubble-label">Koordinator \u2192</div><div class="bubble-text">' + esc(m.text || '') + '</div></div></div>';
+  } else if (m.type === 'message') {
+    var labelF = m.targetAgent != null ? '→ Agent ' + (m.targetAgent + 1) : (m.sourceAgent != null ? '← Agent ' + (m.sourceAgent + 1) : 'Nachricht');
+    return '<div class="bubble-wrap"><div class="bubble bubble-message">' + copyBtn +
+      '<div class="bubble-label">' + esc(labelF) + '</div><div class="bubble-text">' + esc(m.text || '') + '</div></div></div>';
   } else if (m.type === 'question') {
     return '<div class="bubble-wrap"><div class="bubble bubble-question">' + copyBtn +
       '<div class="bubble-label">Frage \u2192</div><div class="bubble-text">' + esc(m.text || '') + '</div></div></div>';
@@ -1400,6 +1520,10 @@ function openAgentModal(idx) {
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'agentModal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Agent Details');
+  overlay.setAttribute('tabindex', '-1');
   overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
 
   overlay.innerHTML = '<div class="modal">' +
@@ -1467,10 +1591,14 @@ function searchModalConv(query) {
         var lowerQ = esc(query).toLowerCase();
         while ((tmpIdx = lowerEsc.indexOf(lowerQ, tmpIdx)) !== -1) { matchCount++; tmpIdx += lowerQ.length; }
       }
-      var copyBtn = '<button class="copy-btn" onclick="copyText(this)" title="Kopieren">\u2398</button>';
+      var copyBtn = '<button class="copy-btn" onclick="copyText(this)" title="Kopieren" aria-label="Text kopieren">\u2398</button>';
       if (m.from === 'coordinator') {
         return '<div class="bubble-wrap right"><div class="bubble bubble-coordinator">' + copyBtn +
           '<div class="bubble-label">Koordinator \u2192</div><div class="bubble-text">' + highlighted + '</div></div></div>';
+      } else if (m.type === 'message') {
+        var sLabel = m.targetAgent != null ? '\u2192 Agent ' + (m.targetAgent + 1) : (m.sourceAgent != null ? '\u2190 Agent ' + (m.sourceAgent + 1) : 'Nachricht');
+        return '<div class="bubble-wrap"><div class="bubble bubble-message">' + copyBtn +
+          '<div class="bubble-label">' + esc(sLabel) + '</div><div class="bubble-text">' + highlighted + '</div></div></div>';
       } else if (m.type === 'question') {
         return '<div class="bubble-wrap"><div class="bubble bubble-question">' + copyBtn +
           '<div class="bubble-label">Frage \u2192</div><div class="bubble-text">' + highlighted + '</div></div></div>';
@@ -1527,7 +1655,7 @@ function renderAgent(agent, idx) {
     '</div>' +
     ((agent.status === 'working' || agent.status === 'asking' || agent.status === 'retrying') ? '<div class="agent-progress"><div class="agent-progress-fill" style="width:' + (agent.progress || 0) + '%"></div></div>' : '') +
     (agent.task ? '<div class="agent-task">' + esc(truncate(agent.task, 90)) + '</div>' : '') +
-    '<div class="agent-conv"' + (allDetailsExpanded ? ' style="max-height:none"' : '') + '>' + bubbles + '</div>' +
+    '<div class="agent-conv" aria-live="polite"' + (allDetailsExpanded ? ' style="max-height:none"' : '') + '>' + bubbles + '</div>' +
     '<div class="agent-foot"><span>' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (agent.duration != null ? ' \u00B7 ' + formatDuration(agent.duration) : '')) + '</span><span>' + retryBtn + ' <a class="details-link" onclick="openAgentModal(' + idx + ')">Details</a></span></div>' +
   '</div>';
 }
@@ -1721,6 +1849,10 @@ function openCompareModal(proj1, proj2) {
   var overlay = document.createElement('div');
   overlay.id = 'compareModal';
   overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Projektvergleich');
+  overlay.setAttribute('tabindex', '-1');
   overlay.onclick = function(e) { if (e.target === overlay) closeCompareModal(); };
 
   overlay.innerHTML = '<div class="modal compare-modal">' +
@@ -1748,7 +1880,7 @@ function compareModalKeyHandler(e) {
 
 function deleteProject(id) {
   if (!confirm('Projekt "' + id + '" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) return;
-  fetch('/api/projects/' + encodeURIComponent(id), { method: 'DELETE' })
+  authFetch('/api/projects/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeadersNoBody() })
     .then(function(r) {
       if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Fehler'); });
       return r.json();
@@ -1764,7 +1896,7 @@ function deleteProject(id) {
 
 function cleanupProjects() {
   if (!confirm('Alle Projekte löschen, die älter als 7 Tage sind?')) return;
-  fetch('/api/cleanup', { method: 'POST' })
+  authFetch('/api/cleanup', { method: 'POST', headers: authHeadersNoBody() })
     .then(function(r) {
       if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Fehler'); });
       return r.json();
@@ -1834,9 +1966,9 @@ async function startProject() {
     var approvalEl = document.getElementById('approvalCheck');
     var requireApproval = approvalEl ? approvalEl.checked : false;
 
-    await fetch('/api/start', {
+    await authFetch('/api/start', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ description: desc, agentCount: count, requireApproval: requireApproval })
     });
   } catch (e) {
@@ -1850,7 +1982,7 @@ async function startProject() {
 
 async function resetProject() {
   if (!confirm('Projekt wirklich zur\u00FCcksetzen?')) return;
-  await fetch('/api/reset', { method: 'POST' });
+  await authFetch('/api/reset', { method: 'POST', headers: authHeadersNoBody() });
   state = {
     phase: 'setup', projectTitle: '', projectSummary: '', projectDir: '',
     coordinator: { status: 'idle', summary: '', activeQuestion: null, log: [] },
@@ -1878,14 +2010,14 @@ async function cloneProject(projectId) {
     return;
   }
   try {
-    var r = await fetch('/api/clone/' + encodeURIComponent(id), { method: 'POST' });
+    var r = await authFetch('/api/clone/' + encodeURIComponent(id), { method: 'POST', headers: authHeadersNoBody() });
     if (!r.ok) {
       var err = await r.json();
       throw new Error(err.error || 'Fehler beim Klonen');
     }
     var data = await r.json();
     // Reset auf Setup-Ansicht
-    await fetch('/api/reset', { method: 'POST' });
+    await authFetch('/api/reset', { method: 'POST', headers: authHeadersNoBody() });
     state = {
       phase: 'setup', projectTitle: '', projectSummary: '', projectDir: '',
       coordinator: { status: 'idle', summary: '', activeQuestion: null, log: [] },
@@ -1948,7 +2080,7 @@ async function loadMergedFiles() {
 
 async function retryAgent(index) {
   try {
-    var r = await fetch('/api/retry/' + index, { method: 'POST' });
+    var r = await authFetch('/api/retry/' + index, { method: 'POST', headers: authHeadersNoBody() });
     if (!r.ok) {
       addBanner('error', 'Agent ' + (index + 1) + ' konnte nicht neu gestartet werden.');
     }
@@ -2059,7 +2191,7 @@ function renderFileTree(files) {
     var items = groups[name];
     var collapsed = fileGroupState[name] || false;
     html += '<div class="file-group">' +
-      '<button class="file-group-header" onclick="toggleFileGroup(\'' + esc(name) + '\')">' +
+      '<button class="file-group-header" onclick="toggleFileGroup(\'' + esc(name) + '\')" aria-expanded="' + (collapsed ? 'false' : 'true') + '">' +
         '<span class="arrow' + (collapsed ? '' : ' open') + '" id="fga-' + esc(name) + '">\u25B6</span> ' +
         '\uD83D\uDCC1 ' + esc(name) +
         '<span class="file-group-count">' + esc(String(items.length)) + ' Datei' + (items.length !== 1 ? 'en' : '') + '</span>' +
@@ -2101,6 +2233,10 @@ function openFileContent(filePath) {
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'fileModal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Dateiinhalt');
+  overlay.setAttribute('tabindex', '-1');
   overlay.onclick = function(e) { if (e.target === overlay) closeFileModal(); };
   overlay.innerHTML = '<div class="modal file-modal">' +
     '<button class="modal-close" onclick="closeFileModal()" title="Schlie\u00DFen">\u00D7</button>' +
@@ -2196,6 +2332,10 @@ function openSettings() {
     var overlay = document.createElement('div');
     overlay.id = 'settingsModal';
     overlay.className = 'modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Einstellungen');
+    overlay.setAttribute('tabindex', '-1');
     overlay.onclick = function(e) { if (e.target === overlay) closeSettings(); };
 
     var fieldsHtml = '';
@@ -2212,6 +2352,12 @@ function openSettings() {
       '<label for="cfg_webhookUrl">Webhook URL</label>' +
       '<input type="text" id="cfg_webhookUrl" value="' + esc(cfg.webhookUrl || '(nicht gesetzt)') + '" readonly>' +
       '<div class="hint">Nur per Umgebungsvariable WEBHOOK_URL \u00E4nderbar</div>' +
+      '</div>';
+
+    fieldsHtml += '<div class="settings-field">' +
+      '<label for="cfg_apiToken">API-Token</label>' +
+      '<input type="password" id="cfg_apiToken" value="' + esc(getApiToken()) + '" placeholder="Kein Token gesetzt">' +
+      '<div class="hint">Wird lokal im Browser gespeichert. Muss mit dem Server-Token (API_TOKEN) \u00FCbereinstimmen.</div>' +
       '</div>';
 
     overlay.innerHTML = '<div class="modal settings-modal">' +
@@ -2243,6 +2389,10 @@ function settingsKeyHandler(e) {
 }
 
 function saveSettings() {
+  // API-Token lokal speichern
+  var tokenInput = document.getElementById('cfg_apiToken');
+  if (tokenInput) setApiToken(tokenInput.value.trim());
+
   var payload = {};
   for (var i = 0; i < SETTINGS_FIELDS.length; i++) {
     var f = SETTINGS_FIELDS[i];
@@ -2252,9 +2402,9 @@ function saveSettings() {
   var statusEl = document.getElementById('settingsStatus');
   if (statusEl) { statusEl.className = 'settings-status'; statusEl.textContent = ''; }
 
-  fetch('/api/config', {
+  authFetch('/api/config', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(payload)
   }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
     .then(function(res) {
@@ -2285,10 +2435,14 @@ function showShortcutsHelp() {
   var overlay = document.createElement('div');
   overlay.id = 'shortcutsModal';
   overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Tastenkürzel');
+  overlay.setAttribute('tabindex', '-1');
   overlay.onclick = function(e) { if (e.target === overlay) closeShortcutsHelp(); };
 
   overlay.innerHTML = '<div class="modal" style="max-width:420px">' +
-    '<button class="modal-close" onclick="closeShortcutsHelp()" title="Schließen">×</button>' +
+    '<button class="modal-close" onclick="closeShortcutsHelp()" title="Schließen" aria-label="Schließen">×</button>' +
     '<h3 style="font-size:16px;font-weight:600;margin-bottom:1rem">Tastenkürzel</h3>' +
     '<div class="shortcuts-grid">' +
       '<kbd>?</kbd><span class="shortcut-desc">Diese Hilfe anzeigen</span>' +
@@ -2388,6 +2542,218 @@ document.addEventListener('keydown', function(e) {
 connect();
 loadTemplates();
 render();
+
+// ── Log-Viewer ────────────────────────────────────────────────
+var logViewerOpen = false;
+var logViewerFilter = '';
+var logViewerTimer = null;
+
+function openLogViewer() {
+  logViewerOpen = true;
+  logViewerFilter = '';
+  fetchAndRenderLogs();
+  logViewerTimer = setInterval(fetchAndRenderLogs, 3000);
+}
+
+function closeLogViewer() {
+  logViewerOpen = false;
+  if (logViewerTimer) { clearInterval(logViewerTimer); logViewerTimer = null; }
+  var el = document.getElementById('logViewerOverlay');
+  if (el) el.remove();
+}
+
+function setLogFilter(level) {
+  logViewerFilter = level;
+  fetchAndRenderLogs();
+}
+
+function fetchAndRenderLogs() {
+  if (!logViewerOpen) return;
+  var url = '/api/logs';
+  if (logViewerFilter) url += '?level=' + logViewerFilter;
+  fetch(url).then(function(r) { return r.json(); }).then(function(logs) {
+    renderLogViewer(logs);
+  }).catch(function() {
+    renderLogViewer([]);
+  });
+}
+
+function renderLogViewer(logs) {
+  var overlay = document.getElementById('logViewerOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'logViewerOverlay';
+    overlay.className = 'log-viewer';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Server-Logs');
+    overlay.setAttribute('tabindex', '-1');
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) closeLogViewer(); });
+    document.body.appendChild(overlay);
+  }
+
+  var filterBtns = ['', 'info', 'warn', 'error'].map(function(lvl) {
+    var label = lvl === '' ? 'Alle' : lvl === 'info' ? 'Info' : lvl === 'warn' ? 'Warn' : 'Error';
+    var active = logViewerFilter === lvl ? ' active' : '';
+    return '<button class="log-filter-btn' + active + '" onclick="setLogFilter('' + lvl + '')">'+label+'</button>';
+  }).join('');
+
+  var entriesHtml = '';
+  if (logs.length === 0) {
+    entriesHtml = '<div class="log-empty">Keine Log-Einträge vorhanden</div>';
+  } else {
+    entriesHtml = logs.map(function(entry) {
+      var rawLevel = (entry.level || 'info').replace(/\[[0-9;]*m/g, '');
+      var levelClass = rawLevel.indexOf('error') >= 0 ? 'log-error' : rawLevel.indexOf('warn') >= 0 ? 'log-warn' : 'log-info';
+      var metaStr = '';
+      if (entry.meta && entry.meta.length > 0) {
+        try { metaStr = ' ' + JSON.stringify(entry.meta[0]); } catch(e) {}
+      }
+      return '<div class="log-entry ' + levelClass + '">' +
+        '<span class="log-ts">' + esc(entry.timestamp || '') + '</span>' +
+        '<span class="log-lvl">' + esc(rawLevel) + '</span>' +
+        '<span class="log-msg">' + esc((entry.message || '') + metaStr) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  overlay.innerHTML =
+    '<div class="log-viewer-panel">' +
+      '<div class="log-viewer-header">' +
+        '<span class="log-viewer-title">Server-Logs</span>' +
+        '<button class="modal-close" onclick="closeLogViewer()">&times;</button>' +
+      '</div>' +
+      '<div class="log-filter-row">' + filterBtns + '</div>' +
+      '<div class="log-entries">' + entriesHtml + '</div>' +
+    '</div>';
+}
+
+// ── Barrierefreiheit (a11y) ───────────────────────────────────
+var PHASE_LABELS = {
+  setup: 'Einrichtung',
+  idle: 'Bereit',
+  planning: 'Planung läuft',
+  running: 'Agenten arbeiten',
+  awaiting_approval: 'Plan wird geprüft',
+  complete: 'Projekt abgeschlossen',
+  partial: 'Teilweise abgeschlossen',
+  error: 'Fehler aufgetreten'
+};
+
+function announcePhase(phase) {
+  var el = document.getElementById('a11yAnnouncer');
+  if (!el) return;
+  var label = PHASE_LABELS[phase] || phase;
+  el.textContent = '';
+  setTimeout(function() { el.textContent = 'Phase: ' + label; }, 50);
+}
+
+// Focus-Management: Trigger-Element merken, Fokus in Modal und zurück
+var _modalTriggerEl = null;
+
+var _origOpenAgentModal = openAgentModal;
+openAgentModal = function(idx) {
+  _modalTriggerEl = document.activeElement;
+  _origOpenAgentModal(idx);
+  var modal = document.getElementById('agentModal');
+  if (modal) {
+    var closeBtn = modal.querySelector('.modal-close');
+    if (closeBtn) closeBtn.focus();
+  }
+};
+
+var _origCloseModal = closeModal;
+closeModal = function() {
+  _origCloseModal();
+  if (_modalTriggerEl && _modalTriggerEl.focus) {
+    _modalTriggerEl.focus();
+    _modalTriggerEl = null;
+  }
+};
+
+var _origOpenSettings = openSettings;
+openSettings = function() {
+  _modalTriggerEl = document.activeElement;
+  _origOpenSettings();
+  setTimeout(function() {
+    var modal = document.getElementById('settingsModal');
+    if (modal) {
+      var closeBtn = modal.querySelector('.modal-close');
+      if (closeBtn) closeBtn.focus();
+    }
+  }, 100);
+};
+
+var _origCloseSettings = closeSettings;
+closeSettings = function() {
+  _origCloseSettings();
+  if (_modalTriggerEl && _modalTriggerEl.focus) {
+    _modalTriggerEl.focus();
+    _modalTriggerEl = null;
+  }
+};
+
+var _origOpenFileContent = openFileContent;
+openFileContent = function(filePath) {
+  _modalTriggerEl = document.activeElement;
+  _origOpenFileContent(filePath);
+  var modal = document.getElementById('fileModal');
+  if (modal) {
+    var closeBtn = modal.querySelector('.modal-close');
+    if (closeBtn) closeBtn.focus();
+  }
+};
+
+var _origCloseFileModal = closeFileModal;
+closeFileModal = function() {
+  _origCloseFileModal();
+  if (_modalTriggerEl && _modalTriggerEl.focus) {
+    _modalTriggerEl.focus();
+    _modalTriggerEl = null;
+  }
+};
+
+var _origOpenCompareModal = openCompareModal;
+openCompareModal = function(p1, p2) {
+  _modalTriggerEl = document.activeElement;
+  _origOpenCompareModal(p1, p2);
+  var modal = document.getElementById('compareModal');
+  if (modal) {
+    var closeBtn = modal.querySelector('.modal-close');
+    if (closeBtn) closeBtn.focus();
+  }
+};
+
+var _origCloseCompareModal = closeCompareModal;
+closeCompareModal = function() {
+  _origCloseCompareModal();
+  if (_modalTriggerEl && _modalTriggerEl.focus) {
+    _modalTriggerEl.focus();
+    _modalTriggerEl = null;
+  }
+};
+
+var _origShowShortcutsHelp = showShortcutsHelp;
+showShortcutsHelp = function() {
+  _modalTriggerEl = document.activeElement;
+  _origShowShortcutsHelp();
+  var modal = document.getElementById('shortcutsModal');
+  if (modal) {
+    var closeBtn = modal.querySelector('.modal-close');
+    if (closeBtn) closeBtn.focus();
+  }
+};
+
+var _origCloseShortcutsHelp = closeShortcutsHelp;
+closeShortcutsHelp = function() {
+  _origCloseShortcutsHelp();
+  if (_modalTriggerEl && _modalTriggerEl.focus) {
+    _modalTriggerEl.focus();
+    _modalTriggerEl = null;
+  }
+};
+
+
 </script>
 </body>
 </html>
