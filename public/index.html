@@ -396,6 +396,16 @@
   mark { background: var(--amber-bg); color: var(--amber-dark); border-radius: 2px; padding: 0 1px; }
 
 
+  /* -- File changes (Diff-Ansicht) -------------------- */
+  .file-changes-section { margin-top: 1rem; margin-bottom: 0.5rem; }
+  .file-change { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 12px; }
+  .file-change-new { color: var(--green); }
+  .file-change-mod { color: var(--amber); }
+  .file-change-icon { flex-shrink: 0; font-size: 13px; }
+  .file-change-name { font-family: var(--mono); font-size: 11px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-change-size { font-family: var(--mono); font-size: 10px; color: var(--txt3); flex-shrink: 0; }
+  .file-changes-empty { font-size: 11.5px; color: var(--txt3); font-style: italic; padding: 3px 0; }
+
   /* -- Shortcuts modal ------------------------------ */
   .shortcuts-grid {
     display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; align-items: center;
@@ -936,6 +946,7 @@ function applyState(s) {
   state.completedAt = s.completedAt || null;
   state.totalDuration = s.totalDuration || null;
   state.tasks = s.tasks || [];
+  state.projectStats = s.projectStats || null;
 }
 
 // ── Banner Management ────────────────────────────────────────
@@ -1076,7 +1087,11 @@ function updateAgent(index) {
   var foot = card.querySelector('.agent-foot');
   if (foot) {
     var retryHtml = agent.status === 'error' ? ' <button class="btn-retry" onclick="retryAgent(' + index + ')">Neu starten</button>' : '';
-    foot.innerHTML = '<span>' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (agent.duration != null ? ' \u00B7 ' + formatDuration(agent.duration) : '')) + '</span><span>' + retryHtml + '</span>';
+    var agentStatsHtml = '';
+    if (agent.status === 'done' && agent.stats) {
+      agentStatsHtml = ' \u00B7 ' + (agent.stats.filesCreated || 0) + ' Dateien \u00B7 ' + (agent.stats.linesOfCode || 0) + ' Zeilen \u00B7 ' + formatFileSize(agent.stats.totalFileSize || 0);
+    }
+    foot.innerHTML = '<span>' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (agent.duration != null ? ' \u00B7 ' + formatDuration(agent.duration) : '')) + agentStatsHtml + '</span><span>' + retryHtml + '</span>';
   }
   // update card class for border color
   card.className = 'agent-card ' + (agent.status || 'waiting');
@@ -1304,10 +1319,12 @@ function renderDashboard() {
   if (isComplete) {
     var totalRounds = agents.reduce(function(sum, a) { return sum + (a.rounds || 0); }, 0);
     var totalQuestions = agents.reduce(function(sum, a) { return sum + (a.questions || 0); }, 0);
+    var ps = state.projectStats || {};
+    var projStatsText = (ps.totalFiles ? ' \u00B7 ' + ps.totalFiles + ' Dateien \u00B7 ' + ps.totalLines + ' Zeilen \u00B7 ' + formatFileSize(ps.totalSize || 0) : '');
     html += '<div class="complete-banner fadein">' +
       '<div style="flex:1">' +
         '<div class="complete-title">\u2713 Alle ' + esc(String(total)) + ' Agenten abgeschlossen</div>' +
-        '<div class="complete-sub">' + esc(String(totalRounds)) + ' Runden \u00B7 ' + esc(String(totalQuestions)) + ' Frage' + (totalQuestions !== 1 ? 'n' : '') + ' \u00B7 ' + esc(String(total)) + ' Agenten' + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + '</div>' +
+        '<div class="complete-sub">' + esc(String(totalRounds)) + ' Runden \u00B7 ' + esc(String(totalQuestions)) + ' Frage' + (totalQuestions !== 1 ? 'n' : '') + ' \u00B7 ' + esc(String(total)) + ' Agenten' + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + projStatsText + '</div>' +
         (state.projectDir ? '<div class="complete-path">' + esc(state.projectDir) + '</div>' : '') +
       '</div>' +
       '<button class="btn-outline" onclick="exportProject()">ZIP Export</button> ' +
@@ -1339,11 +1356,13 @@ function renderDashboard() {
     var failedCount = state._failedCount || agents.filter(function(a) { return a.status === 'error'; }).length;
     var failedIdxs = state._failedAgents || agents.map(function(a, i) { return a.status === 'error' ? i : -1; }).filter(function(i) { return i >= 0; });
     var totalRoundsP = agents.reduce(function(sum, a) { return sum + (a.rounds || 0); }, 0);
+    var psP = state.projectStats || {};
+    var projStatsTextP = (psP.totalFiles ? ' \u00B7 ' + psP.totalFiles + ' Dateien \u00B7 ' + psP.totalLines + ' Zeilen \u00B7 ' + formatFileSize(psP.totalSize || 0) : '');
 
     html += '<div class="partial-banner fadein">' +
       '<div style="flex:1">' +
         '<div class="partial-title">\u26A0 ' + esc(String(successCount)) + ' von ' + esc(String(total)) + ' Agenten erfolgreich. ' + esc(String(failedCount)) + ' fehlgeschlagen.</div>' +
-        '<div class="partial-sub">' + esc(String(totalRoundsP)) + ' Runden' + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + '</div>' +
+        '<div class="partial-sub">' + esc(String(totalRoundsP)) + ' Runden' + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + projStatsTextP + '</div>' +
         (state.projectDir ? '<div class="partial-path">' + esc(state.projectDir) + '</div>' : '') +
         '<div class="partial-retry-btns">' +
           failedIdxs.map(function(idx) {
@@ -1500,6 +1519,31 @@ function renderBubbleFull(m) {
   }
 }
 
+function renderFileChanges(agent) {
+  var changes = agent.fileChanges;
+  if (!changes || changes.length === 0) {
+    return '<div class="file-changes-section">' +
+      '<div class="section-label">Dateien</div>' +
+      '<div class="file-changes-empty">Keine Datei\u00E4nderungen erkannt.</div>' +
+    '</div>';
+  }
+  var html = '<div class="file-changes-section">' +
+    '<div class="section-label">Dateien (' + changes.length + ')</div>';
+  changes.forEach(function(fc) {
+    var isNew = fc.type === 'created';
+    var cls = isNew ? 'file-change-new' : 'file-change-mod';
+    var icon = isNew ? '\uD83C\uDD95' : '\u270F\uFE0F';
+    var label = isNew ? 'Neu' : 'Ge\u00E4ndert';
+    html += '<div class="file-change ' + cls + '">' +
+      '<span class="file-change-icon" title="' + label + '">' + icon + '</span>' +
+      '<span class="file-change-name">' + esc(fc.path) + '</span>' +
+      '<span class="file-change-size">' + formatFileSize(fc.size) + '</span>' +
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
 function openAgentModal(idx) {
   var agent = state.agents[idx];
   if (!agent) return;
@@ -1526,6 +1570,9 @@ function openAgentModal(idx) {
   overlay.setAttribute('tabindex', '-1');
   overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
 
+  // Datei-Aenderungen rendern
+  var fileChangesHtml = renderFileChanges(agent);
+
   overlay.innerHTML = '<div class="modal">' +
     '<button class="modal-close" onclick="closeModal()" title="Schlie\u00DFen">\u00D7</button>' +
     '<div class="modal-header">' +
@@ -1536,6 +1583,7 @@ function openAgentModal(idx) {
       '</div>' +
       (agent.task ? '<div class="modal-agent-task">' + esc(agent.task) + '</div>' : '') +
     '</div>' +
+    fileChangesHtml +
     '<div class="modal-search">' +
       '<input class="modal-search-input" type="text" placeholder="Im Verlauf suchen\u2026" oninput="searchModalConv(this.value)" id="modalSearchInput">' +
       '<span class="modal-search-count" id="modalSearchCount"></span>' +
@@ -1656,7 +1704,7 @@ function renderAgent(agent, idx) {
     ((agent.status === 'working' || agent.status === 'asking' || agent.status === 'retrying') ? '<div class="agent-progress"><div class="agent-progress-fill" style="width:' + (agent.progress || 0) + '%"></div></div>' : '') +
     (agent.task ? '<div class="agent-task">' + esc(truncate(agent.task, 90)) + '</div>' : '') +
     '<div class="agent-conv" aria-live="polite"' + (allDetailsExpanded ? ' style="max-height:none"' : '') + '>' + bubbles + '</div>' +
-    '<div class="agent-foot"><span>' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (agent.duration != null ? ' \u00B7 ' + formatDuration(agent.duration) : '')) + '</span><span>' + retryBtn + ' <a class="details-link" onclick="openAgentModal(' + idx + ')">Details</a></span></div>' +
+    '<div class="agent-foot"><span>' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (agent.duration != null ? ' \u00B7 ' + formatDuration(agent.duration) : '')) + (agent.status === 'done' && agent.stats ? ' \u00B7 ' + (agent.stats.filesCreated || 0) + ' Dateien \u00B7 ' + (agent.stats.linesOfCode || 0) + ' Zeilen \u00B7 ' + formatFileSize(agent.stats.totalFileSize || 0) : '') + '</span><span>' + retryBtn + ' <a class="details-link" onclick="openAgentModal(' + idx + ')">Details</a></span></div>' +
   '</div>';
 }
 
@@ -1756,7 +1804,8 @@ function renderHistory() {
     if (compareMode) {
       html += '<input type="checkbox" class="compare-check"' + (isChecked ? ' checked' : '') + ' onclick="event.stopPropagation();toggleCompareSelect(\'' + pid + '\')"' + (!isChecked && compareSelected.length >= 2 ? ' disabled' : '') + '>';
     }
-    html += '<span class="history-title" onclick="loadProject(\'' + pid + '\')">' + esc(p.title || p.id || p) + (p.totalDuration ? ' (' + formatDuration(p.totalDuration) + ')' : '') + '</span>' +
+    var histFileCount = (p.projectStats && p.projectStats.totalFiles) ? ' \u00B7 ' + p.projectStats.totalFiles + ' Dateien' : '';
+    html += '<span class="history-title" onclick="loadProject(\'' + pid + '\')">' + esc(p.title || p.id || p) + (p.totalDuration ? ' (' + formatDuration(p.totalDuration) + histFileCount + ')' : '') + '</span>' +
       '<span class="history-id">' + pid + '</span>' +
       '<button class="history-clone" onclick="event.stopPropagation();cloneProject(\'' + pid + '\')" title="Projekt wiederholen">\u21BB</button>' +
       '<button class="history-delete" onclick="event.stopPropagation();deleteProject(\'' + pid + '\')" title="Projekt l\u00F6schen">\u2715</button>' +
@@ -1812,7 +1861,8 @@ function extractCompareStats(proj) {
     totalRounds: totalRounds,
     totalQuestions: totalQuestions,
     duration: proj.totalDuration,
-    agents: agents
+    agents: agents,
+    projectStats: proj.projectStats || null
   };
 }
 
@@ -1825,7 +1875,10 @@ function renderCompareCol(stats) {
     '<div class="compare-stat"><span class="compare-stat-label">Fehlgeschlagen</span><span class="compare-stat-value">' + esc(String(stats.errorCount)) + '</span></div>' +
     '<div class="compare-stat"><span class="compare-stat-label">Runden gesamt</span><span class="compare-stat-value">' + esc(String(stats.totalRounds)) + '</span></div>' +
     '<div class="compare-stat"><span class="compare-stat-label">Fragen gesamt</span><span class="compare-stat-value">' + esc(String(stats.totalQuestions)) + '</span></div>' +
-    '<div class="compare-stat"><span class="compare-stat-label">Dauer</span><span class="compare-stat-value">' + esc(stats.duration != null ? formatDuration(stats.duration) : '\u2014') + '</span></div>';
+    '<div class="compare-stat"><span class="compare-stat-label">Dauer</span><span class="compare-stat-value">' + esc(stats.duration != null ? formatDuration(stats.duration) : '\u2014') + '</span></div>' +
+    (stats.projectStats ? '<div class="compare-stat"><span class="compare-stat-label">Dateien</span><span class="compare-stat-value">' + esc(String(stats.projectStats.totalFiles || 0)) + '</span></div>' +
+    '<div class="compare-stat"><span class="compare-stat-label">Zeilen</span><span class="compare-stat-value">' + esc(String(stats.projectStats.totalLines || 0)) + '</span></div>' +
+    '<div class="compare-stat"><span class="compare-stat-label">Dateigr\u00F6\u00DFe</span><span class="compare-stat-value">' + formatFileSize(stats.projectStats.totalSize || 0) + '</span></div>' : '');
 
   if (stats.agents.length > 0) {
     html += '<div class="compare-agents-title">Agenten</div>';

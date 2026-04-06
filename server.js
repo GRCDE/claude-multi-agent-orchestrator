@@ -58,6 +58,11 @@ let clientIdCounter = 0;
 const clients = new Map();
 const MAX_CLIENTS = 50;
 
+// ── SSE Event-Historie für Reconnect-Recovery ────────────────
+let eventId = 0;
+const eventHistory = [];
+const MAX_EVENT_HISTORY = 200;
+
 // Heartbeat: Prüfe alle 30s ob Clients noch leben
 setInterval(() => {
   for (const [id, res] of clients) {
@@ -70,7 +75,11 @@ setInterval(() => {
 }, 30000);
 
 function broadcast(eventName, data) {
-  const msg = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+  eventId++;
+  eventHistory.push({ id: eventId, event: eventName, data, timestamp: Date.now() });
+  if (eventHistory.length > MAX_EVENT_HISTORY) eventHistory.shift();
+
+  const msg = `id: ${eventId}\nevent: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const [id, res] of clients) {
     try {
       res.write(msg);
@@ -102,7 +111,11 @@ function flushBatch() {
 
   // Einzelne Events senden (nicht als Array, damit Frontend kompatibel bleibt)
   for (const { event, data } of batch) {
-    const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    eventId++;
+    eventHistory.push({ id: eventId, event, data, timestamp: Date.now() });
+    if (eventHistory.length > MAX_EVENT_HISTORY) eventHistory.shift();
+
+    const msg = `id: ${eventId}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const [id, res] of clients) {
       try { res.write(msg); } catch { clients.delete(id); }
     }
@@ -123,8 +136,20 @@ app.get('/api/stream', (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  // Aktuellen Zustand sofort senden
-  res.write(`event: state\ndata: ${JSON.stringify(orchestrator.getState())}\n\n`);
+  // Prüfe ob Client sich reconnected und verpasste Events nachholen will
+  const lastEventId = parseInt(req.headers['last-event-id']);
+  if (lastEventId && !isNaN(lastEventId)) {
+    // Verpasste Events seit letzter bekannter ID wiederholen
+    const missedEvents = eventHistory.filter(e => e.id > lastEventId);
+    for (const evt of missedEvents) {
+      res.write(`id: ${evt.id}\nevent: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`);
+    }
+    // Recovery-Info an Client senden
+    res.write(`id: ${eventId}\nevent: reconnect_recovery\ndata: ${JSON.stringify({ recoveredCount: missedEvents.length, lastKnownId: lastEventId, currentId: eventId })}\n\n`);
+  } else {
+    // Erster Connect: aktuellen Zustand sofort senden
+    res.write(`event: state\ndata: ${JSON.stringify(orchestrator.getState())}\n\n`);
+  }
 
   // Keep-alive Ping
   const ping = setInterval(() => {
@@ -251,7 +276,8 @@ app.get('/api/projects', (req, res) => {
         createdAt: parseInt(d.replace('proj_', '')) || 0,
         totalDuration: state?.totalDuration || null,
         startedAt: state?.startedAt || null,
-        completedAt: state?.completedAt || null
+        completedAt: state?.completedAt || null,
+        projectStats: state?.projectStats || null
       };
     })
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -473,6 +499,170 @@ app.get('/api/export/:id', (req, res) => {
   archive.pipe(res);
   archive.directory(dir, req.params.id);
   archive.finalize();
+});
+
+// ── JSON Export ───────────────────────────────────────────
+app.get('/api/export-json/:id', (req, res) => {
+  const id = req.params.id;
+  const projectDir = path.join(__dirname, 'projects', id);
+  // Pfad-Traversal verhindern
+  if (!projectDir.startsWith(path.join(__dirname, 'projects'))) {
+    return res.status(400).json({ error: 'Ungültiger Pfad' });
+  }
+  if (!fs.existsSync(projectDir)) {
+    return res.status(404).json({ error: 'Projekt nicht gefunden' });
+  }
+
+  let state;
+  try {
+    state = JSON.parse(fs.readFileSync(path.join(projectDir, 'state.json'), 'utf8'));
+  } catch {
+    return res.status(404).json({ error: 'state.json nicht gefunden' });
+  }
+
+  function listAgentFiles(agentDir) {
+    if (!fs.existsSync(agentDir)) return [];
+    try {
+      return fs.readdirSync(agentDir).filter(f => f !== 'conversation.jsonl');
+    } catch { return []; }
+  }
+
+  function readConversation(agentDir) {
+    const logFile = path.join(agentDir, 'conversation.jsonl');
+    if (!fs.existsSync(logFile)) return [];
+    try {
+      return fs.readFileSync(logFile, 'utf8')
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => { try { return JSON.parse(line); } catch { return null; } })
+        .filter(Boolean);
+    } catch { return []; }
+  }
+
+  const agents = (state.agents || []).map((agent, i) => {
+    const agentDir = path.join(projectDir, 'agent-' + (i + 1));
+    return {
+      title: agent.title || '',
+      role: agent.role || '',
+      task: agent.task || '',
+      status: agent.status || '',
+      duration: agent.duration || null,
+      files: listAgentFiles(agentDir),
+      conversation: readConversation(agentDir)
+    };
+  });
+
+  const result = {
+    projectTitle: state.projectTitle || '',
+    projectSummary: state.projectSummary || (state.coordinator && state.coordinator.summary) || '',
+    createdAt: state.startedAt ? new Date(state.startedAt).toISOString() : '',
+    totalDuration: state.totalDuration || null,
+    agents: agents
+  };
+
+  const fileName = id + '.json';
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="' + fileName + '"');
+  res.send(JSON.stringify(result, null, 2));
+});
+
+// ── Markdown Export ───────────────────────────────────────
+app.get('/api/export-markdown/:id', (req, res) => {
+  const id = req.params.id;
+  const projectDir = path.join(__dirname, 'projects', id);
+  // Pfad-Traversal verhindern
+  if (!projectDir.startsWith(path.join(__dirname, 'projects'))) {
+    return res.status(400).json({ error: 'Ungültiger Pfad' });
+  }
+  if (!fs.existsSync(projectDir)) {
+    return res.status(404).json({ error: 'Projekt nicht gefunden' });
+  }
+
+  let state;
+  try {
+    state = JSON.parse(fs.readFileSync(path.join(projectDir, 'state.json'), 'utf8'));
+  } catch {
+    return res.status(404).json({ error: 'state.json nicht gefunden' });
+  }
+
+  function listAgentFiles(agentDir) {
+    if (!fs.existsSync(agentDir)) return [];
+    try {
+      return fs.readdirSync(agentDir).filter(f => f !== 'conversation.jsonl');
+    } catch { return []; }
+  }
+
+  function readConversation(agentDir) {
+    const logFile = path.join(agentDir, 'conversation.jsonl');
+    if (!fs.existsSync(logFile)) return [];
+    try {
+      return fs.readFileSync(logFile, 'utf8')
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => { try { return JSON.parse(line); } catch { return null; } })
+        .filter(Boolean);
+    } catch { return []; }
+  }
+
+  function formatDurationMd(seconds) {
+    if (!seconds) return 'k.A.';
+    if (seconds < 60) return seconds + 's';
+    var m = Math.floor(seconds / 60);
+    var s = seconds % 60;
+    return m + 'min ' + s + 's';
+  }
+
+  const statusLabels = {
+    done: 'Fertig', error: 'Fehler', working: 'In Arbeit',
+    waiting: 'Wartend', asking: 'Fragt Koordinator'
+  };
+
+  let md = '# ' + (state.projectTitle || 'Projekt') + '\n\n';
+  md += (state.projectSummary || (state.coordinator && state.coordinator.summary) || '') + '\n\n';
+
+  if (state.startedAt) {
+    md += '**Erstellt:** ' + new Date(state.startedAt).toLocaleString('de-DE') + '\n\n';
+  }
+  if (state.totalDuration) {
+    md += '**Gesamtdauer:** ' + formatDurationMd(state.totalDuration) + '\n\n';
+  }
+
+  md += '---\n\n';
+
+  (state.agents || []).forEach((agent, i) => {
+    const agentDir = path.join(projectDir, 'agent-' + (i + 1));
+    const files = listAgentFiles(agentDir);
+    const conversation = readConversation(agentDir);
+
+    md += '## Agent ' + (i + 1) + ': ' + (agent.title || 'Unbenannt') + '\n\n';
+    md += '**Rolle:** ' + (agent.role || 'k.A.') + '\n\n';
+    md += '**Aufgabe:** ' + (agent.task || 'k.A.') + '\n\n';
+    md += '**Status:** ' + (statusLabels[agent.status] || agent.status || 'k.A.');
+    md += ' | **Dauer:** ' + formatDurationMd(agent.duration) + '\n\n';
+
+    if (files.length > 0) {
+      md += '### Dateien\n\n';
+      files.forEach(f => { md += '- ' + f + '\n'; });
+      md += '\n';
+    }
+
+    if (conversation.length > 0) {
+      md += '### Verlauf\n\n';
+      conversation.forEach(msg => {
+        const role = msg.role === 'agent' ? 'Agent' : (msg.role === 'coordinator' ? 'Koordinator' : (msg.role || 'System'));
+        const text = (msg.content || msg.text || '').replace(/\n/g, '\n> ');
+        md += '> **' + role + ':** ' + text + '\n>\n';
+      });
+      md += '\n';
+    }
+
+    md += '---\n\n';
+  });
+
+  const fileName = id + '-bericht.md';
+  res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="' + fileName + '"');
+  res.send(md);
 });
 
 // ── Zusammengeführte Dateien ──────────────────────────────────

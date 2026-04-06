@@ -21,6 +21,7 @@ const CONFIG = {
   concurrency: parseInt(process.env.AGENT_CONCURRENCY) || 3,
   maxRounds: parseInt(process.env.MAX_ROUNDS) || 5,
   autoRetry: process.env.AUTO_RETRY !== 'false',
+  isolation: process.env.AGENT_ISOLATION || 'shared',
 };
 
 // ── Semaphore für parallele Ausführung ────────────────────────
@@ -336,6 +337,50 @@ function validatePlan(parsed) {
   return parsed;
 }
 
+// ── Prompt-Templates laden ───────────────────────────────────
+const HARDCODED_PROMPTS = {
+  coordinator_plan: 'Du bist Projekt-Koordinator. Analysiere das Projekt und erstelle genau {agentCount} Teilaufgaben.\n\nConstraints:\n- Aufgaben sollen moeglichst unabhaengig sein\n- Falls eine Aufgabe auf das Ergebnis einer anderen angewiesen ist, nutze "depends_on" mit den 0-basierten Indizes der Abhaengigkeiten\n- Aufgaben ohne Abhaengigkeiten bekommen ein leeres Array: "depends_on":[]\n- Jede Task-Beschreibung soll 100-500 Zeichen lang sein\n- Keine Ueberlappung zwischen den Aufgaben\n- Jede Aufgabe soll verschiedene Faehigkeiten/Bereiche abdecken\n\nAntworte NUR mit validem JSON (kein Markdown, kein Text davor/danach):\n{"project_title":"string","summary":"1-2 Saetze auf Deutsch","quality_notes":"Kurze Begruendung der Aufgabenstruktur","tasks":[{"title":"Kurztitel","task":"Detaillierte Aufgabe","deliverable":"Was der Agent liefern soll","role":"Passende Rolle, z.B. Backend-Entwickler, Frontend-Entwickler, DevOps-Ingenieur, etc.","depends_on":[]}]}\n\nProjekt: {description}',
+  coordinator_answer: 'Du bist Projekt-Koordinator. Beantworte die Frage des Agenten kurz und pr\u00e4zise auf Deutsch.\n\nProjektbeschreibung: {description}\n\nAlle Agenten-Aufgaben:\n{taskSummary}\n\nAgent {agentNum} \u2013 Aufgabe: {agentTitle}\n{agentTask}\n\n{previousQuestions}Agent {agentNum} fragt: {question}\n\nAntworte direkt und konkret.',
+  coordinator_summary: 'Du bist Projekt-Koordinator. Alle Agenten sind fertig. Erstelle eine kurze, pr\u00e4gnante Zusammenfassung auf Deutsch.\n\nProjektbeschreibung: {description}\n\nErgebnisse der Agenten:\n{agentResults}\n\nFasse zusammen:\n1. Was wurde insgesamt erreicht?\n2. Welche Agenten waren erfolgreich, welche nicht?\n3. Gibt es offene Punkte oder Empfehlungen?\n\nAntworte in 3-6 S\u00e4tzen, klar und konkret.',
+  agent_system: '{rolePrefix}Du bist Agent {agentNum} im Projekt "{projectTitle}".\nDu arbeitest in deinem Verzeichnis: {agentDir}\n\nDeine Aufgabe: {task}\nDein Lieferergebnis: {deliverable}\n\nAndere Agenten im Projekt (arbeiten parallel \u2013 NICHT von ihnen abh\u00e4ngig machen):\n{otherAgentsCtx}\n{sharedCtx}\nRegeln:\n1. Arbeite konkret und erstelle echte Dateien in deinem Verzeichnis\n2. Wenn du eine Kl\u00e4rung vom Koordinator brauchst: schreibe EXAKT "FRAGE: [deine genaue Frage]" und STOPPE SOFORT danach \u2013 schreibe NICHTS mehr nach der Frage\n3. Maximal 2 Fragen erlaubt \u2013 nutze sie sinnvoll\n4. Wenn du fertig bist: schreibe am Ende EXAKT "FERTIG" als letztes Wort\n5. Schreibe NIEMALS "FRAGE:" und "FERTIG" in der gleichen Antwort\n6. Um einem anderen Agenten eine Nachricht zu senden: "NACHRICHT AN Agent X: [deine Nachricht]"',
+};
+
+function loadPrompts() {
+  const promptsFile = process.env.PROMPTS_FILE || 'prompts.json';
+  const candidates = [
+    path.join(__dirname, promptsFile),
+    path.join(__dirname, 'prompts.default.json'),
+  ];
+  for (const filePath of candidates) {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      const merged = { ...HARDCODED_PROMPTS };
+      for (const key of Object.keys(HARDCODED_PROMPTS)) {
+        if (typeof parsed[key] === 'string' && parsed[key].trim()) {
+          merged[key] = parsed[key];
+        }
+      }
+      logger.info('Prompt-Templates geladen', { source: filePath, keys: Object.keys(parsed).filter(k => typeof parsed[k] === 'string') });
+      return merged;
+    } catch (e) {
+      if (e.code !== 'ENOENT') {
+        logger.warn('Fehler beim Laden der Prompt-Templates', { file: filePath, error: e.message });
+      }
+    }
+  }
+  logger.info('Verwende eingebaute Prompt-Templates (keine prompts.json oder prompts.default.json gefunden)');
+  return { ...HARDCODED_PROMPTS };
+}
+
+function renderPrompt(template, vars) {
+  let result = template;
+  for (const [key, value] of Object.entries(vars)) {
+    result = result.split('{' + key + '}').join(value != null ? String(value) : '');
+  }
+  return result;
+}
+
 // ── Hook-System: Lade optionale hooks.js aus Projekt-Root ────
 function loadHooks() {
   try {
@@ -361,6 +406,7 @@ class Orchestrator extends EventEmitter {
     this._abortController = new AbortController();
     this._activeProcesses = new Set();
     this.hooks = loadHooks();
+    this.prompts = loadPrompts();
     this.reset();
   }
 
@@ -458,6 +504,15 @@ class Orchestrator extends EventEmitter {
   }
 
   getState() {
+    // Projekt-Statistiken aus Agent-Stats aggregieren
+    let totalFiles = 0, totalSize = 0, totalLines = 0;
+    for (const agent of this.agents) {
+      if (agent.stats) {
+        totalFiles += agent.stats.filesCreated || 0;
+        totalSize += agent.stats.totalFileSize || 0;
+        totalLines += agent.stats.linesOfCode || 0;
+      }
+    }
     return {
       phase: this.phase,
       projectId: this.projectId,
@@ -474,7 +529,8 @@ class Orchestrator extends EventEmitter {
       agents: this.agents,
       startedAt: this.startedAt,
       completedAt: this.completedAt,
-      totalDuration: this.totalDuration
+      totalDuration: this.totalDuration,
+      projectStats: { totalFiles, totalSize, totalLines }
     };
   }
 
@@ -790,21 +846,10 @@ class Orchestrator extends EventEmitter {
 
   // ── Koordinator: Aufgaben planen ────────────────────────────
   async _coordinatorPlan(agentCount) {
-    const prompt =
-`Du bist Projekt-Koordinator. Analysiere das Projekt und erstelle genau ${agentCount} Teilaufgaben.
-
-Constraints:
-- Aufgaben sollen moeglichst unabhaengig sein
-- Falls eine Aufgabe auf das Ergebnis einer anderen angewiesen ist, nutze "depends_on" mit den 0-basierten Indizes der Abhaengigkeiten
-- Aufgaben ohne Abhaengigkeiten bekommen ein leeres Array: "depends_on":[]
-- Jede Task-Beschreibung soll 100-500 Zeichen lang sein
-- Keine Ueberlappung zwischen den Aufgaben
-- Jede Aufgabe soll verschiedene Faehigkeiten/Bereiche abdecken
-
-Antworte NUR mit validem JSON (kein Markdown, kein Text davor/danach):
-{"project_title":"string","summary":"1-2 Saetze auf Deutsch","quality_notes":"Kurze Begruendung der Aufgabenstruktur","tasks":[{"title":"Kurztitel","task":"Detaillierte Aufgabe","deliverable":"Was der Agent liefern soll","role":"Passende Rolle, z.B. Backend-Entwickler, Frontend-Entwickler, DevOps-Ingenieur, etc.","depends_on":[]}]}
-
-Projekt: ${this.projectDesc}`;
+    const prompt = renderPrompt(this.prompts.coordinator_plan, {
+      agentCount: agentCount,
+      description: this.projectDesc,
+    });
 
     const raw = await runClaude(prompt, this.projectDir, this, this._activeProcesses, this._abortController.signal);
     let parsed;
@@ -860,17 +905,24 @@ Projekt: ${this.projectDesc}`;
 
     validateWorkDir(agentDir);
     logger.info('Agent gestartet', { agent: agentNum, task: task.title });
+
+    // Datei-Snapshot VOR Agent-Start erstellen
+    const fileSnapshotBefore = this._snapshotDir(agentDir);
+
     this._patchAgent(idx, { status: 'working', progress: 10, startTime: Date.now() });
     await this._saveState();
 
     // Kontext über andere Agenten (was sie tun, ohne Details)
-    const otherAgentsCtx = this.tasks
+    // Im strikten Modus kein Kontext über andere Agenten
+    const isStrict = CONFIG.isolation === 'strict';
+    const otherAgentsCtx = isStrict ? '' : this.tasks
       .map((t, i) => i !== idx ? `- Agent ${i + 1}: ${t.title}` : null)
       .filter(Boolean)
       .join('\n');
 
     // Shared Context von bereits fertigen Agenten lesen
-    const sharedCtx = await this._readSharedContext();
+    // Im strikten Modus kein gemeinsamer Kontext
+    const sharedCtx = isStrict ? '' : await this._readSharedContext();
 
     // Lokaler Fragen-Zähler
     let questionsUsed = 0;
@@ -881,23 +933,22 @@ Projekt: ${this.projectDesc}`;
     // Rollen-Prefix falls vorhanden
     const rolePrefix = task.role ? `Du bist ein erfahrener ${task.role}.\n` : '';
 
-    const agentSystemPrompt =
-`${rolePrefix}Du bist Agent ${agentNum} im Projekt "${this.projectTitle}".
-Du arbeitest in deinem Verzeichnis: ${agentDir}
+    const isolationHint = isStrict
+      ? '\nDu arbeitest in einer isolierten Umgebung. Du kannst NUR Dateien in deinem eigenen Verzeichnis erstellen und lesen. Greife NICHT auf Dateien anderer Agenten zu.\n'
+      : '';
 
-Deine Aufgabe: ${task.task}
-Dein Lieferergebnis: ${task.deliverable}
+    const sharedCtxBlock = sharedCtx ? `\nBisheriger Kontext anderer Agenten:\n${sharedCtx}\n` : '';
 
-Andere Agenten im Projekt (arbeiten parallel – NICHT von ihnen abhängig machen):
-${otherAgentsCtx || 'Keine'}
-${sharedCtx ? `\nBisheriger Kontext anderer Agenten:\n${sharedCtx}\n` : ''}
-Regeln:
-1. Arbeite konkret und erstelle echte Dateien in deinem Verzeichnis
-2. Wenn du eine Klärung vom Koordinator brauchst: schreibe EXAKT "FRAGE: [deine genaue Frage]" und STOPPE SOFORT danach – schreibe NICHTS mehr nach der Frage
-3. Maximal 2 Fragen erlaubt – nutze sie sinnvoll
-4. Wenn du fertig bist: schreibe am Ende EXAKT "FERTIG" als letztes Wort
-5. Schreibe NIEMALS "FRAGE:" und "FERTIG" in der gleichen Antwort
-6. Um einem anderen Agenten eine Nachricht zu senden: "NACHRICHT AN Agent X: [deine Nachricht]"`;
+    const agentSystemPrompt = renderPrompt(this.prompts.agent_system, {
+      rolePrefix: rolePrefix,
+      agentNum: agentNum,
+      projectTitle: this.projectTitle,
+      agentDir: agentDir,
+      task: task.task,
+      deliverable: task.deliverable,
+      otherAgentsCtx: otherAgentsCtx || 'Keine',
+      sharedCtx: sharedCtxBlock,
+    }) + isolationHint;
 
     for (let round = 0; round < CONFIG.maxRounds; round++) {
       this._checkAborted();
@@ -982,7 +1033,15 @@ Regeln:
           if (isDone) this._patchAgent(idx, { progress: 95 });
           const agentEndTime = Date.now();
           const agentDuration = Math.round((agentEndTime - (this.agents[idx].startTime || agentEndTime)) / 1000);
-          this._patchAgent(idx, { status: 'done', progress: 100, endTime: agentEndTime, duration: agentDuration });
+          // Datei-Diff nach Agent-Abschluss
+          const fileSnapshotAfter = this._snapshotDir(agentDir);
+          const fileChanges = this._diffSnapshot(fileSnapshotBefore, fileSnapshotAfter);
+          this._patchAgent(idx, { status: 'done', progress: 100, endTime: agentEndTime, duration: agentDuration, fileChanges });
+          // Statistiken berechnen
+          try {
+            const stats = await this._calculateAgentStats(agentDir);
+            this._patchAgent(idx, { stats });
+          } catch {}
           // Transcript speichern
           try {
             await fsp.writeFile(path.join(agentDir, 'transcript.md'),
@@ -1001,7 +1060,15 @@ Regeln:
     }
     const agentEndTime2 = Date.now();
     const agentDuration2 = Math.round((agentEndTime2 - (this.agents[idx].startTime || agentEndTime2)) / 1000);
-    this._patchAgent(idx, { status: 'done', progress: 100, endTime: agentEndTime2, duration: agentDuration2 });
+    // Datei-Diff nach Agent-Abschluss (Fallback-Ende)
+    const fileSnapshotAfter2 = this._snapshotDir(agentDir);
+    const fileChanges2 = this._diffSnapshot(fileSnapshotBefore, fileSnapshotAfter2);
+    this._patchAgent(idx, { status: 'done', progress: 100, endTime: agentEndTime2, duration: agentDuration2, fileChanges: fileChanges2 });
+    // Statistiken berechnen
+    try {
+      const stats = await this._calculateAgentStats(agentDir);
+      this._patchAgent(idx, { stats });
+    } catch {}
     await this._writeSharedContext(idx);
     await this._saveState();
   }
@@ -1022,20 +1089,16 @@ Regeln:
       .join('\n');
 
     const agentTask = this.tasks[agentIdx];
-    const prompt =
-`Du bist Projekt-Koordinator. Beantworte die Frage des Agenten kurz und präzise auf Deutsch.
-
-Projektbeschreibung: ${this.projectDesc}
-
-Alle Agenten-Aufgaben:
-${taskSummary}
-
-Agent ${agentIdx + 1} – Aufgabe: ${agentTask.title}
-${agentTask.task}
-
-${previousQuestions ? `Bisherige Fragen dieses Agents:\n${previousQuestions}\n` : ''}Agent ${agentIdx + 1} fragt: ${question}
-
-Antworte direkt und konkret.`;
+    const prevQText = previousQuestions ? `Bisherige Fragen dieses Agents:\n${previousQuestions}\n` : '';
+    const prompt = renderPrompt(this.prompts.coordinator_answer, {
+      description: this.projectDesc,
+      taskSummary: taskSummary,
+      agentNum: agentIdx + 1,
+      agentTitle: agentTask.title,
+      agentTask: agentTask.task,
+      previousQuestions: prevQText,
+      question: question,
+    });
 
     const answer = await runClaude(prompt, this.projectDir, this, this._activeProcesses, this._abortController.signal);
 
@@ -1058,20 +1121,10 @@ Antworte direkt und konkret.`;
         return `- Agent ${i + 1} "${a.title}": Status=${a.status}, Lieferergebnis: ${task ? task.deliverable : 'n/a'}`;
       }).join('\n');
 
-      const prompt =
-`Du bist Projekt-Koordinator. Alle Agenten sind fertig. Erstelle eine kurze, prägnante Zusammenfassung auf Deutsch.
-
-Projektbeschreibung: ${this.projectDesc}
-
-Ergebnisse der Agenten:
-${agentResults}
-
-Fasse zusammen:
-1. Was wurde insgesamt erreicht?
-2. Welche Agenten waren erfolgreich, welche nicht?
-3. Gibt es offene Punkte oder Empfehlungen?
-
-Antworte in 3-6 Sätzen, klar und konkret.`;
+      const prompt = renderPrompt(this.prompts.coordinator_summary, {
+        description: this.projectDesc,
+        agentResults: agentResults,
+      });
 
       const summary = await runClaude(prompt, this.projectDir, this, this._activeProcesses, this._abortController.signal);
       this.projectSummary = summary;
@@ -1223,6 +1276,67 @@ Antworte in 3-6 Sätzen, klar und konkret.`;
     }
   }
 
+  // ── Datei-Snapshot: Verzeichnisinhalt mit Größe/mtime erfassen ──
+  _snapshotDir(dir) {
+    const snapshot = {};
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true, recursive: false });
+      for (const entry of entries) {
+        if (entry.isFile()) {
+          try {
+            const filePath = path.join(dir, entry.name);
+            const stat = fs.statSync(filePath);
+            snapshot[entry.name] = { size: stat.size, mtime: stat.mtimeMs };
+          } catch {}
+        }
+      }
+    } catch {}
+    return snapshot;
+  }
+
+  // ── Diff zwischen zwei Snapshots: erstellt/geändert ermitteln ──
+  _diffSnapshot(before, after) {
+    const changes = [];
+    for (const [file, info] of Object.entries(after)) {
+      if (!before[file]) {
+        changes.push({ path: file, type: 'created', size: info.size });
+      } else if (before[file].size !== info.size || before[file].mtime !== info.mtime) {
+        changes.push({ path: file, type: 'modified', size: info.size });
+      }
+    }
+    return changes;
+  }
+
+  // ── Agent-Statistiken berechnen ─────────────────────────────
+  async _calculateAgentStats(agentDir) {
+    const SKIP = new Set(['conversation.jsonl', 'task.md', 'transcript.md']);
+    const TXT = new Set(['.js','.ts','.jsx','.tsx','.py','.rb','.go','.rs','.java','.c','.cpp','.h','.hpp','.cs','.php','.swift','.kt','.scala','.sh','.bash','.zsh','.ps1','.bat','.cmd','.sql','.html','.htm','.css','.scss','.less','.sass','.xml','.svg','.yaml','.yml','.toml','.ini','.cfg','.conf','.env','.md','.txt','.json','.jsonl','.csv','.tsv','.log','.vue','.svelte','.astro','.graphql','.gql','.proto','.dockerfile','.makefile','.cmake','.gradle','.r','.m','.mm','.lua','.dart','.ex','.exs','.erl','.hs','.elm','.clj','.cljs','.lisp','.scheme','.pl','.pm','.zig','.nim','.v','.tf','.hcl']);
+    let filesCreated = 0, totalFileSize = 0, linesOfCode = 0, responseLength = 0;
+    try {
+      const entries = fs.readdirSync(agentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() || SKIP.has(entry.name)) continue;
+        filesCreated++;
+        try {
+          const fp = path.join(agentDir, entry.name);
+          const st = fs.statSync(fp);
+          totalFileSize += st.size;
+          const ext = path.extname(entry.name).toLowerCase();
+          if (TXT.has(ext) || ext === '') {
+            linesOfCode += fs.readFileSync(fp, 'utf-8').split('\n').length;
+          }
+        } catch {}
+      }
+    } catch {}
+    try {
+      const convContent = await fsp.readFile(path.join(agentDir, 'conversation.jsonl'), 'utf-8');
+      for (const line of convContent.trim().split('\n').filter(Boolean)) {
+        try { const m = JSON.parse(line); if (m.from === 'agent' && m.text) responseLength += m.text.length; } catch {}
+      }
+    } catch {}
+    return { filesCreated, totalFileSize, linesOfCode, responseLength };
+  }
+
   // ── Hilfsfunktionen ─────────────────────────────────────────
   _coordState() {
     return {
@@ -1264,6 +1378,7 @@ Orchestrator.prototype.getConfig = function() {
     maxAgents: CONFIG.maxAgents,
     concurrency: CONFIG.concurrency,
     maxRounds: CONFIG.maxRounds,
+    isolation: CONFIG.isolation,
     webhookUrl: process.env.WEBHOOK_URL
       ? process.env.WEBHOOK_URL.replace(/^(https?:\/\/[^/]{4})[^/]*/, '$1***')
       : ''
@@ -1280,9 +1395,19 @@ Orchestrator.prototype.updateConfig = function(patch) {
     maxRounds:      { key: 'maxRounds',   min: 1,      max: 20 },
   };
 
+  const VALID_ISOLATION_MODES = ['shared', 'strict'];
+
   const errors = [];
   for (const [field, val] of Object.entries(patch)) {
     if (field === 'webhookUrl') {
+      continue;
+    }
+    if (field === 'isolation') {
+      if (!VALID_ISOLATION_MODES.includes(val)) {
+        errors.push(`isolation muss 'shared' oder 'strict' sein`);
+      } else {
+        CONFIG.isolation = val;
+      }
       continue;
     }
     const rule = RULES[field];
