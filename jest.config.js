@@ -5,5 +5,8 @@ module.exports = {
   testTimeout: 30000,
   verbose: true,
   // API-Tests starten Server – seriell ausführen um Port-Konflikte zu vermeiden
-  maxWorkers: 1
+  maxWorkers: 1,
+  // Node 24 unterstuetzt alle verwendeten Syntax-Features nativ,
+  // Babel-Transform ueberspringen um Parser-Fehler zu vermeiden
+  transform: {}
 };

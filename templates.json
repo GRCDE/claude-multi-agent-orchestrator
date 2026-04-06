@@ -5,45 +5,85 @@
       "name": "REST API",
       "description": "Erstelle eine vollständige REST API mit Express.js, inklusive CRUD-Operationen, Authentifizierung, Validierung und Tests.",
       "suggestedAgents": 4,
-      "icon": "\ud83d\udd0c"
+      "icon": "🔌"
     },
     {
       "id": "cli-tool",
       "name": "CLI Tool",
       "description": "Erstelle ein professionelles Kommandozeilen-Tool mit Node.js, inklusive Argument-Parsing, Help-Output, Farben und Tests.",
       "suggestedAgents": 3,
-      "icon": "\u2328\ufe0f"
+      "icon": "⌨️"
     },
     {
       "id": "react-app",
       "name": "React App",
       "description": "Erstelle eine moderne React-Anwendung mit TypeScript, Routing, State Management, API-Anbindung und responsivem Design.",
       "suggestedAgents": 5,
-      "icon": "\u269b\ufe0f"
+      "icon": "⚛️"
     },
     {
       "id": "python-ml",
       "name": "Python ML Pipeline",
       "description": "Erstelle eine Machine-Learning-Pipeline mit Python: Datenvorverarbeitung, Feature Engineering, Modelltraining, Evaluation und Deployment-Script.",
       "suggestedAgents": 4,
-      "icon": "\ud83e\udde0"
+      "icon": "🧠"
     },
     {
       "id": "fullstack",
       "name": "Fullstack Web App",
       "description": "Erstelle eine Fullstack-Webanwendung mit Frontend (HTML/CSS/JS), Backend (Node.js/Express), Datenbank-Schema und Docker-Konfiguration.",
       "suggestedAgents": 5,
-      "icon": "\ud83c\udf10"
+      "icon": "🌐"
     }
   ],
   "taskPresets": [
-    { "id": "frontend", "name": "Frontend", "icon": "\ud83c\udfa8", "task": "Erstelle das Frontend mit HTML, CSS und JavaScript. Responsives Design, moderne UI." },
-    { "id": "backend", "name": "Backend API", "icon": "\u2699\ufe0f", "task": "Erstelle die Backend API mit Express.js. REST-Endpunkte, Validierung, Fehlerbehandlung." },
-    { "id": "database", "name": "Datenbank", "icon": "\ud83d\uddc4\ufe0f", "task": "Erstelle das Datenbankschema, Migrations-Skripte und Seed-Daten." },
-    { "id": "testing", "name": "Tests", "icon": "\ud83e\uddea", "task": "Schreibe Unit-Tests, Integration-Tests und End-to-End-Tests." },
-    { "id": "docs", "name": "Dokumentation", "icon": "\ud83d\udcdd", "task": "Erstelle README, API-Dokumentation, Architektur-Diagramme und Setup-Anleitung." },
-    { "id": "devops", "name": "DevOps", "icon": "\ud83d\ude80", "task": "Erstelle Dockerfile, CI/CD Pipeline, Deployment-Skripte und Monitoring-Konfiguration." },
-    { "id": "security", "name": "Security", "icon": "\ud83d\udd12", "task": "Implementiere Authentifizierung, Autorisierung, Input-Validierung und Security-Headers." },
-    { "id": "performance", "name": "Performance", "icon": "\u26a1", "task": "Optimiere Ladezeiten, implementiere Caching, Komprimierung und Lazy Loading." }
+    {
+      "id": "frontend",
+      "name": "Frontend",
+      "icon": "🎨",
+      "task": "Erstelle das Frontend mit HTML, CSS und JavaScript. Responsives Design, moderne UI."
+    },
+    {
+      "id": "backend",
+      "name": "Backend API",
+      "icon": "⚙️",
+      "task": "Erstelle die Backend API mit Express.js. REST-Endpunkte, Validierung, Fehlerbehandlung."
+    },
+    {
+      "id": "database",
+      "name": "Datenbank",
+      "icon": "🗄️",
+      "task": "Erstelle das Datenbankschema, Migrations-Skripte und Seed-Daten."
+    },
+    {
+      "id": "testing",
+      "name": "Tests",
+      "icon": "🧪",
+      "task": "Schreibe Unit-Tests, Integration-Tests und End-to-End-Tests."
+    },
+    {
+      "id": "docs",
+      "name": "Dokumentation",
+      "icon": "📝",
+      "task": "Erstelle README, API-Dokumentation, Architektur-Diagramme und Setup-Anleitung."
+    },
+    {
+      "id": "devops",
+      "name": "DevOps",
+      "icon": "🚀",
+      "task": "Erstelle Dockerfile, CI/CD Pipeline, Deployment-Skripte und Monitoring-Konfiguration."
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "icon": "🔒",
+      "task": "Implementiere Authentifizierung, Autorisierung, Input-Validierung und Security-Headers."
+    },
+    {
+      "id": "performance",
+      "name": "Performance",
+      "icon": "⚡",
+      "task": "Optimiere Ladezeiten, implementiere Caching, Komprimierung und Lazy Loading."
+    }
   ]
 }
