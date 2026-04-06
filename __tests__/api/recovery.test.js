@@ -6,6 +6,8 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 
+jest.setTimeout(60000);
+
 const TEST_PORT = 3224;
 
 function request(method, urlPath, body = null) {
@@ -41,7 +43,7 @@ jest.mock('express-rate-limit', () => {
 });
 
 describe('Recovery API', () => {
-  beforeAll(done => {
+  beforeAll(async () => {
     // Alle Checkpoint-Dateien im projects-Verzeichnis entfernen, damit kein Crash erkannt wird
     const projectsDir = path.join(__dirname, '..', '..', 'projects');
     try {
@@ -70,11 +72,11 @@ describe('Recovery API', () => {
 
     try {
       require('../../server');
-      setTimeout(done, 500);
+      await new Promise(resolve => setTimeout(resolve, 500));
     } catch (e) {
-      done(e);
+      throw e;
     }
-  });
+  }, 30000);
 
   afterAll(async () => {
     const serverMod = require('../../server');

@@ -393,7 +393,8 @@ Multiagents/
 ├── logs/                  Rotierte Log-Dateien (auto-erstellt)
 ├── __tests__/
 │   ├── unit/              31 Test-Dateien
-│   ├── api/               33 API-Test-Dateien
+│   ├── api/               39 API-Test-Dateien
+│   ├── e2e/               1 Playwright Smoke Test
 │   └── integration/       1 Orchestrator E2E Test
 ├── .env.example           Konfigurationsvorlage
 ├── hooks.example.js       Hook-System Beispiel
@@ -413,10 +414,11 @@ Multiagents/
 
 ## Tests
 
-65 Test-Suites (`npm test`):
+72 Test-Suites (`npm test`):
 
 - **Unit** (31): API-Docs, Backoff, Batch-Processor, Config, Config-Profiles, Config-Validation, Delta-Writes, Dependency, Dependency-Graph, Format-Detection, Health-Monitor, Hooks, I18n, Intervention, Intervention-Types, JSON-Parsing, Load-Project, Log-Search, Progress, Rate-Limit, Resume, Retry-Strategies, Scoring, Semaphore, Shared-Context, Snapshot-Manager, State-Persistence, Template-Manager, Timing, Token-Tracking, Webhook
-- **API** (33): Abort-Resume, Agent-Prompts, Analytics, Auth, Batch, Budget, Changelog, Config, Docs, Export, File-Browser, Health, Health-Detailed, Merge, Metrics, Milestones, Performance, Profiles, Prompts, Queue, Queue-Priority, Recovery, Reorder, Roles, Search, Search-Full, Server, Snapshots, Stats, Templates, Templates-Managed, Undo-Redo, Webhooks
+- **API** (39): Abort-Resume, Agent-Prompts, Analytics, Auth, Batch, Budget, Changelog, Config, Docs, Export, Export-Formats, File-Browser, Health, Health-Detailed, I18n-Strategies, Intervention, Merge, Metrics, Milestones, Performance, Profiles, Project-Lifecycle, Projects, Prompts, Queue, Queue-Priority, Recovery, Reorder, Roles, Search, Search-Full, Server, Snapshots, Stats, Templates, Templates-Managed, Undo-Redo, Webhooks
+- **E2E** (1): Playwright Smoke Test
 - **Integration** (1): Orchestrator E2E
 
 Jeder API-Test nutzt einen eigenen Port (3196+) um Konflikte zu vermeiden.

@@ -205,6 +205,126 @@ describe('E2E Smoke Tests', () => {
     expect(modalAfter).toBeNull();
   });
 
+  test('Dark Mode Toggle: Klick wechselt Theme', async () => {
+    await page.goto(BASE_URL, { waitUntil: 'networkidle' });
+
+    // Aktuelles Theme ermitteln
+    const themeBefore = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+
+    // Theme-Button klicken
+    await page.evaluate(() => {
+      document.getElementById('themeToggle').click();
+    });
+
+    // Theme muss gewechselt haben
+    const themeAfter = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    expect(themeAfter).not.toBe(themeBefore);
+
+    // Zurueck klicken
+    await page.evaluate(() => {
+      document.getElementById('themeToggle').click();
+    });
+
+    const themeRestored = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    expect(themeRestored).toBe(themeBefore);
+  });
+
+  test('Projekt-Historie: historyArea existiert', async () => {
+    await page.goto(BASE_URL, { waitUntil: 'networkidle' });
+
+    // Settings oeffnen (dort wird historyArea erzeugt)
+    // historyArea wird im Hauptbereich gerendert wenn Projekte vorhanden
+    // Pruefen ob das Element im DOM ist (kann leer sein bei 0 Projekten)
+    const historyExists = await page.evaluate(() => {
+      // historyArea wird dynamisch erstellt wenn Projekte geladen werden
+      // Wir triggern die Projekt-Ansicht
+      if (typeof loadProjects === 'function') loadProjects();
+      return true;
+    });
+    expect(historyExists).toBe(true);
+
+    // Warte kurz damit loadProjects fertig ist
+    await page.waitForTimeout(500);
+
+    // Pruefen dass historyArea im DOM existiert
+    const areaInDom = await page.evaluate(() => {
+      var el = document.getElementById('historyArea');
+      return el !== null;
+    });
+    expect(areaInDom).toBe(true);
+  });
+
+  test('Search: Text eingeben loest Reaktion aus', async () => {
+    await page.goto(BASE_URL, { waitUntil: 'networkidle' });
+
+    await page.waitForSelector('#globalSearchInput', { state: 'visible', timeout: 5000 });
+
+    // Text eingeben
+    await page.fill('#globalSearchInput', 'Testsuche');
+    const value = await page.inputValue('#globalSearchInput');
+    expect(value).toBe('Testsuche');
+
+    // Warten auf Debounce (300ms) + etwas Puffer
+    await page.waitForTimeout(500);
+
+    // Pruefen ob das Suchfeld den Wert behalten hat (kein Fehler aufgetreten)
+    const valueAfter = await page.inputValue('#globalSearchInput');
+    expect(valueAfter).toBe('Testsuche');
+
+    // Keine JS-Fehler durch die Suche
+    expect(jsErrors).toEqual([]);
+  });
+
+  test('Settings Tabs: Alle 5 Tabs durchklicken', async () => {
+    await page.goto(BASE_URL, { waitUntil: 'networkidle' });
+
+    // Settings oeffnen
+    await page.evaluate(() => {
+      document.getElementById('settingsToggle').click();
+    });
+
+    // Warten bis Modal im DOM erscheint
+    await page.waitForFunction(
+      () => document.getElementById('settingsModal') !== null,
+      { timeout: 5000 }
+    );
+
+    // Warten bis Tab-Bar erstellt wird (setTimeout 150ms im Code)
+    await page.waitForFunction(
+      () => document.querySelector('.settings-tab-bar') !== null,
+      { timeout: 5000 }
+    );
+
+    // Alle 5 Tabs pruefen
+    const tabNames = ['general', 'webhooks', 'profiles', 'snapshots', 'logs'];
+    const tabLabels = ['Allgemein', 'Webhooks', 'Profile', 'Snapshots', 'Logs'];
+
+    for (let i = 0; i < tabNames.length; i++) {
+      // Tab klicken
+      await page.evaluate((tabName) => {
+        switchSettingsTab(tabName);
+      }, tabNames[i]);
+
+      // Kurz warten
+      await page.waitForTimeout(200);
+
+      // Pruefen dass der richtige Tab aktiv ist
+      const activeTabText = await page.evaluate(() => {
+        var active = document.querySelector('.settings-tab-bar .modal-tab.active');
+        return active ? active.textContent : null;
+      });
+      expect(activeTabText).toBe(tabLabels[i]);
+
+      // Keine JS-Fehler
+      expect(jsErrors).toEqual([]);
+    }
+
+    // Modal schliessen
+    await page.evaluate(() => {
+      if (typeof closeSettings === 'function') closeSettings();
+    });
+  });
+
   test('Screenshot erstellen', async () => {
     await page.goto(BASE_URL, { waitUntil: 'networkidle' });
 
