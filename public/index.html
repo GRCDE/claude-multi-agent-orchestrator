@@ -3598,9 +3598,6 @@ function copyText(btn) {
 }
 
 // ── Rollen-System ─────────────────────────────────────────────
-var cachedRoles = [];
-var rolesLoaded = false;
-
 function loadRolesCache() {
   return fetch("/api/roles").then(function(r) { return r.json(); }).then(function(data) {
     cachedRoles = data.roles || [];
