@@ -34,6 +34,10 @@ jest.mock('child_process', () => ({
   execSync: jest.fn(() => 'claude 1.0.0'),
 }));
 
+jest.mock('express-rate-limit', () => {
+  return () => (req, res, next) => next();
+});
+
 describe('Config API', () => {
   beforeAll(done => {
     process.env.PORT = TEST_PORT;
@@ -46,6 +50,11 @@ describe('Config API', () => {
     } catch (e) {
       done(e);
     }
+  });
+
+  afterAll(async () => {
+    const serverMod = require('../../server');
+    if (serverMod && serverMod.cleanup) await serverMod.cleanup();
   });
 
   test('GET /api/config gibt Config-Objekt zurueck', async () => {

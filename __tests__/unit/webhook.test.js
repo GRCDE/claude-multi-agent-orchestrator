@@ -19,19 +19,9 @@ const Orchestrator = require('../../orchestrator');
 
 describe('_sendWebhook()', () => {
   let orch;
-  const origEnv = process.env.WEBHOOK_URL;
 
   beforeEach(() => {
     orch = new Orchestrator();
-    delete process.env.WEBHOOK_URL;
-  });
-
-  afterEach(() => {
-    if (origEnv !== undefined) {
-      process.env.WEBHOOK_URL = origEnv;
-    } else {
-      delete process.env.WEBHOOK_URL;
-    }
   });
 
   test('tut nichts wenn WEBHOOK_URL nicht gesetzt', async () => {
@@ -41,7 +31,7 @@ describe('_sendWebhook()', () => {
 
   test('crasht nicht bei Netzwerkfehler', async () => {
     // Setze eine URL die nicht erreichbar ist
-    process.env.WEBHOOK_URL = 'http://127.0.0.1:19999/webhook-that-does-not-exist';
+    orch.updateConfig({ webhookUrl: 'http://127.0.0.1:19999/webhook-that-does-not-exist' });
     // _sendWebhook fängt alle Fehler intern ab
     await expect(orch._sendWebhook('test_event', { foo: 'bar' })).resolves.toBeUndefined();
   });
@@ -63,11 +53,13 @@ describe('_sendWebhook()', () => {
     await new Promise(resolve => server.listen(0, resolve));
     const port = server.address().port;
 
-    process.env.WEBHOOK_URL = `http://127.0.0.1:${port}/hook`;
+    orch.updateConfig({ webhookUrl: `http://127.0.0.1:${port}/hook` });
     orch.projectId = 'proj_test123';
 
     await orch._sendWebhook('project_started', { title: 'Test Projekt' });
 
+    // Kurz warten damit der Server die Anfrage verarbeiten kann
+    await new Promise(r => setTimeout(r, 100));
     server.close();
 
     expect(receivedBody).not.toBeNull();

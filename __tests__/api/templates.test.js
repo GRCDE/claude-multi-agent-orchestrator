@@ -33,6 +33,10 @@ jest.mock('child_process', () => ({
   execSync: jest.fn(() => 'claude 1.0.0'),
 }));
 
+jest.mock('express-rate-limit', () => {
+  return () => (req, res, next) => next();
+});
+
 describe('GET /api/templates', () => {
   beforeAll(done => {
     process.env.PORT = TEST_PORT;
@@ -47,18 +51,27 @@ describe('GET /api/templates', () => {
     }
   });
 
-  test('gibt ein Array zurueck', async () => {
+  afterAll(async () => {
+    const serverMod = require('../../server');
+    if (serverMod && serverMod.cleanup) await serverMod.cleanup();
+  });
+
+  test('gibt Templates und TaskPresets zurueck', async () => {
     const res = await request('GET', '/api/templates');
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body).toHaveProperty('templates');
+    expect(res.body).toHaveProperty('taskPresets');
+    expect(Array.isArray(res.body.templates)).toBe(true);
+    expect(Array.isArray(res.body.taskPresets)).toBe(true);
+    expect(res.body.templates.length).toBeGreaterThan(0);
+    expect(res.body.taskPresets.length).toBeGreaterThan(0);
   });
 
   test('jedes Template hat erforderliche Felder', async () => {
     const res = await request('GET', '/api/templates');
     expect(res.status).toBe(200);
 
-    for (const template of res.body) {
+    for (const template of res.body.templates) {
       expect(template).toHaveProperty('id');
       expect(template).toHaveProperty('name');
       expect(template).toHaveProperty('description');
@@ -72,8 +85,20 @@ describe('GET /api/templates', () => {
 
   test('suggestedAgents ist eine positive Zahl', async () => {
     const res = await request('GET', '/api/templates');
-    for (const template of res.body) {
+    for (const template of res.body.templates) {
       expect(template.suggestedAgents).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test('jeder TaskPreset hat erforderliche Felder', async () => {
+    const res = await request('GET', '/api/templates');
+    for (const preset of res.body.taskPresets) {
+      expect(preset).toHaveProperty('id');
+      expect(preset).toHaveProperty('name');
+      expect(preset).toHaveProperty('task');
+      expect(typeof preset.id).toBe('string');
+      expect(typeof preset.name).toBe('string');
+      expect(typeof preset.task).toBe('string');
     }
   });
 });

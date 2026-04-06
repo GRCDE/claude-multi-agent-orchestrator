@@ -1,0 +1,27 @@
+{
+  "milestones": [
+    {
+      "id": "mvp-webapp",
+      "title": "MVP Web-App",
+      "description": "Erstelle eine vollständige Web-Applikation mit Frontend und Backend",
+      "agentCount": 4,
+      "tasks": [
+        { "title": "Backend API", "task": "Erstelle REST API mit Express", "deliverable": "server.js mit Endpunkten" },
+        { "title": "Datenbank", "task": "Erstelle SQLite Schema und Seed-Daten", "deliverable": "db.js und schema.sql" },
+        { "title": "Frontend", "task": "Erstelle React Frontend", "deliverable": "src/ Verzeichnis" },
+        { "title": "Tests", "task": "Schreibe Unit und Integration Tests", "deliverable": "tests/ Verzeichnis", "depends_on": [0, 1, 2] }
+      ]
+    },
+    {
+      "id": "refactoring",
+      "title": "Code Refactoring",
+      "description": "Refactore bestehenden Code für bessere Wartbarkeit",
+      "agentCount": 3,
+      "tasks": [
+        { "title": "Analyse", "task": "Analysiere Code-Qualität und identifiziere Probleme", "deliverable": "analyse.md" },
+        { "title": "Refactoring", "task": "Führe Refactoring durch", "deliverable": "refactored files", "depends_on": [0] },
+        { "title": "Tests", "task": "Überprüfe und aktualisiere Tests", "deliverable": "test results", "depends_on": [1] }
+      ]
+    }
+  ]
+}

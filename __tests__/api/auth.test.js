@@ -37,6 +37,10 @@ jest.mock('child_process', () => ({
   execSync: jest.fn(() => 'claude 1.0.0'),
 }));
 
+jest.mock('express-rate-limit', () => {
+  return () => (req, res, next) => next();
+});
+
 describe('API-Authentifizierung', () => {
   beforeAll(done => {
     process.env.PORT = TEST_PORT;
@@ -124,5 +128,10 @@ describe('API-Authentifizierung', () => {
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('phase');
     });
+  });
+
+  afterAll(async () => {
+    const serverMod = require('../../server');
+    if (serverMod && serverMod.cleanup) await serverMod.cleanup();
   });
 });

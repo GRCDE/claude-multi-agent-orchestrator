@@ -1,26 +1,24 @@
 # Multi-Agent Orchestrator – Docker Image
-# Minimales Node.js-Image mit Non-Root User für Sicherheit
+# Leichtgewichtiges Alpine-Image, kein Build-Step nötig
+#
+# HINWEIS: Die Claude Code CLI ist im Container NICHT verfügbar.
+# Der Container eignet sich zum Testen des Web-Servers und der API,
+# aber die eigentliche Agent-Orchestrierung benötigt eine lokale
+# Installation mit Zugriff auf die Claude CLI.
 
-FROM node:20-slim
-
-# Non-Root User erstellen
-RUN groupadd --gid 1001 appuser \
-    && useradd --uid 1001 --gid appuser --shell /bin/bash --create-home appuser
+FROM node:20-alpine
 
 WORKDIR /app
 
 # Abhängigkeiten zuerst kopieren (Docker Layer-Cache nutzen)
 COPY package*.json ./
-RUN npm ci --production
+RUN npm ci --only=production
 
 # Restlichen Quellcode kopieren
 COPY . .
 
-# Projektverzeichnis erstellen und Rechte setzen
-RUN mkdir -p /app/projects && chown -R appuser:appuser /app
-
-# Als Non-Root User ausführen
-USER appuser
+# Projektverzeichnis erstellen
+RUN mkdir -p /app/projects
 
 EXPOSE 3131
 

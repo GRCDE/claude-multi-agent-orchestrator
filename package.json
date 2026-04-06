@@ -1,10 +1,16 @@
 {
   "name": "claude-multiagents",
-  "version": "3.0.0",
+  "version": "4.1.0",
   "description": "Multi-Agent Orchestrator powered by Claude Code CLI",
   "main": "server.js",
   "type": "commonjs",
-  "keywords": ["multi-agent", "claude", "orchestrator", "ai", "automation"],
+  "keywords": [
+    "multi-agent",
+    "claude",
+    "orchestrator",
+    "ai",
+    "automation"
+  ],
   "author": "choda",
   "license": "MIT",
   "scripts": {
@@ -18,10 +24,12 @@
   },
   "dependencies": {
     "archiver": "^7.0.1",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "express-rate-limit": "^8.3.2",
-    "winston": "^3.19.0"
+    "winston": "^3.19.0",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "jest": "^29.7.0"

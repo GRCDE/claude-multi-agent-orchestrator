@@ -1,7 +1,11 @@
 node_modules/
 projects/
+logs/
+snapshots/
+profiles/
 *.log
 .env
+webhooks.json
 coverage/
 .DS_Store
 Thumbs.db

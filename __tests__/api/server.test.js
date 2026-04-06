@@ -36,6 +36,10 @@ jest.mock('child_process', () => ({
   execSync: jest.fn(() => 'claude 1.0.0'),
 }));
 
+jest.mock('express-rate-limit', () => {
+  return () => (req, res, next) => next();
+});
+
 describe('REST API', () => {
   let server;
 
@@ -52,6 +56,11 @@ describe('REST API', () => {
     } catch(e) {
       done(e);
     }
+  });
+
+  afterAll(async () => {
+    const serverMod = require('../../server');
+    if (serverMod && serverMod.cleanup) await serverMod.cleanup();
   });
 
   test('GET /health gibt Status zurück', async () => {

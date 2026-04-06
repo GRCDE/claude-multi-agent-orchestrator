@@ -1,6 +1,8 @@
-node_modules
-.git
-projects
-coverage
-*.log
+node_modules/
+.git/
+__tests__/
+projects/
+*.md
 .env
+coverage/
+*.log
