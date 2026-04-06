@@ -3,9 +3,14 @@ projects/
 logs/
 snapshots/
 profiles/
+screenshots/
+test-snapshots-*/
+test-templates-*/
+templates/
 *.log
 .env
 webhooks.json
+pw-debug.js
 coverage/
 .DS_Store
 Thumbs.db

@@ -8540,10 +8540,14 @@ function openSettings() {
   closeSettings();
   Promise.all([
     fetch('/api/config').then(function(r) { return r.json(); }),
-    fetch('/api/prompts').then(function(r) { return r.json(); }).catch(function() { return null; })
+    fetch('/api/prompts').then(function(r) { return r.json(); }).catch(function() { return null; }),
+    fetch('/api/retry-strategies').then(function(r) { return r.json(); }).catch(function() { return null; }),
+    fetch('/api/retry-strategy').then(function(r) { return r.json(); }).catch(function() { return null; })
   ]).then(function(results) {
     var cfg = results[0];
     var promptData = results[1];
+    var retryStrategies = results[2];
+    var currentRetryStrategy = results[3];
 
     var overlay = document.createElement('div');
     overlay.id = 'settingsModal';
@@ -8564,6 +8568,30 @@ function openSettings() {
         '<div class="hint">' + esc(f.hint) + '</div>' +
         '</div>';
     }
+    // ── Retry-Strategie Dropdown ──
+    if (retryStrategies && currentRetryStrategy) {
+      window._retryStrategyDescriptions = {};
+      var retryOptionsHtml = '';
+      var stratKeys = Object.keys(retryStrategies);
+      for (var rs = 0; rs < stratKeys.length; rs++) {
+        var sKey = stratKeys[rs];
+        var sInfo = retryStrategies[sKey];
+        window._retryStrategyDescriptions[sKey] = sInfo.description || '';
+        var selected = (currentRetryStrategy.strategy === sKey) ? ' selected' : '';
+        retryOptionsHtml += '<option value="' + esc(sKey) + '"' + selected + '>' + esc(sInfo.name) + '</option>';
+      }
+      fieldsHtml += '<div style="border-top:1px solid var(--border);margin:16px 0 12px;padding-top:14px">' +
+        '<div style="font-size:13px;font-weight:600;margin-bottom:10px">Retry-Strategie</div>' +
+        '<div class="settings-field">' +
+          '<label for="cfg_retryStrategy">Aktive Strategie</label>' +
+          '<select id="cfg_retryStrategy" onchange="updateRetryStrategyHint()" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--txt);font-size:13px">' +
+            retryOptionsHtml +
+          '</select>' +
+          '<div class="hint" id="retryStrategyHint">' + esc(retryStrategies[currentRetryStrategy.strategy] ? retryStrategies[currentRetryStrategy.strategy].description : '') + '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
     fieldsHtml += '<div style="border-top:1px solid var(--border);margin:16px 0 12px;padding-top:14px">' +
       '<div style="font-size:13px;font-weight:600;margin-bottom:10px">Webhook</div>' +
       '<div class="settings-field">' +
@@ -9006,6 +9034,14 @@ async function deleteCustomRole(roleId) {
   }
 }
 
+function updateRetryStrategyHint() {
+  var sel = document.getElementById('cfg_retryStrategy');
+  var hint = document.getElementById('retryStrategyHint');
+  if (sel && hint && window._retryStrategyDescriptions) {
+    hint.textContent = window._retryStrategyDescriptions[sel.value] || '';
+  }
+}
+
 function testAlertSounds() {
   var wasDnd = doNotDisturb;
   var wasSound = soundEnabled;
@@ -9057,31 +9093,52 @@ function saveSettings() {
   }
   var webhookInput = document.getElementById('cfg_webhookUrl');
   if (webhookInput) payload.webhookUrl = webhookInput.value.trim();
+
+  // Retry-Strategie separat speichern
+  var retryStrategySelect = document.getElementById('cfg_retryStrategy');
+  var retryStrategyPromise = Promise.resolve();
+  if (retryStrategySelect) {
+    retryStrategyPromise = authFetch('/api/retry-strategy', {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ strategy: retryStrategySelect.value })
+    }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+      .catch(function(e) { return { ok: false, data: { error: e.message } }; });
+  }
+
   var statusEl = document.getElementById('settingsStatus');
   if (statusEl) { statusEl.className = 'settings-status'; statusEl.textContent = ''; }
 
-  authFetch('/api/config', {
+  var configFetchPromise = authFetch('/api/config', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(payload)
   }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-    .then(function(res) {
-      if (statusEl) {
-        if (res.ok && res.data.ok) {
-          statusEl.className = 'settings-status ok';
-          statusEl.textContent = 'Einstellungen gespeichert!';
-          setTimeout(closeSettings, 1200);
-        } else {
-          statusEl.className = 'settings-status err';
-          statusEl.textContent = res.data.error || 'Fehler beim Speichern';
-        }
-      }
-    }).catch(function(e) {
-      if (statusEl) {
+    .catch(function(e) { return { ok: false, data: { error: e.message } }; });
+
+  Promise.all([configFetchPromise, retryStrategyPromise]).then(function(results) {
+    var configRes = results[0];
+    var retryRes = results[1];
+    if (statusEl) {
+      var retryFailed = retryRes && !retryRes.ok;
+      if (configRes.ok && configRes.data.ok && !retryFailed) {
+        statusEl.className = 'settings-status ok';
+        statusEl.textContent = 'Einstellungen gespeichert!';
+        setTimeout(closeSettings, 1200);
+      } else {
         statusEl.className = 'settings-status err';
-        statusEl.textContent = 'Netzwerkfehler: ' + e.message;
+        var errMsg = '';
+        if (!configRes.ok || !configRes.data.ok) errMsg += configRes.data.error || 'Fehler beim Speichern';
+        if (retryFailed) errMsg += (errMsg ? ' | ' : '') + (retryRes.data.error || 'Retry-Strategie Fehler');
+        statusEl.textContent = errMsg;
       }
-    });
+    }
+  }).catch(function(e) {
+    if (statusEl) {
+      statusEl.className = 'settings-status err';
+      statusEl.textContent = 'Netzwerkfehler: ' + e.message;
+    }
+  });
 }
 
 function testWebhook() {
@@ -11554,7 +11611,8 @@ openSettings = function() {
       '<button class="modal-tab active" onclick="switchSettingsTab(\'general\')">Allgemein</button>' +
       '<button class="modal-tab" onclick="switchSettingsTab(\'webhooks\')">Webhooks</button>' +
       '<button class="modal-tab" onclick="switchSettingsTab(\'profiles\')">Profile</button>' +
-      '<button class="modal-tab" onclick="switchSettingsTab(\'snapshots\')">Snapshots</button>';
+      '<button class="modal-tab" onclick="switchSettingsTab(\'snapshots\')">Snapshots</button>' +
+      '<button class="modal-tab" onclick="switchSettingsTab(\'logs\')">Logs</button>';
 
     var h3 = modal.querySelector('h3');
     var closeBtn = modal.querySelector('.modal-close');
@@ -11590,6 +11648,11 @@ openSettings = function() {
     snapshotsContent.className = 'settings-tab-content';
     snapshotsContent.style.display = 'none';
 
+    var logsContent = document.createElement('div');
+    logsContent.id = 'logsTabContent';
+    logsContent.className = 'settings-tab-content';
+    logsContent.style.display = 'none';
+
     if (h3 && h3.nextSibling) {
       modal.insertBefore(tabBar, h3.nextSibling);
     } else {
@@ -11599,6 +11662,7 @@ openSettings = function() {
     modal.appendChild(webhooksContent);
     modal.appendChild(profilesContent);
     modal.appendChild(snapshotsContent);
+    modal.appendChild(logsContent);
   }, 150);
 };
 
@@ -11607,9 +11671,10 @@ function switchSettingsTab(tab) {
   var webhooksEl = document.getElementById('webhooksTabContent');
   var profilesEl = document.getElementById('profilesTabContent');
   var snapshotsEl = document.getElementById('snapshotsTabContent');
+  var logsEl = document.getElementById('logsTabContent');
   var tabs = document.querySelectorAll('.settings-tab-bar .modal-tab');
 
-  var panels = [generalEl, webhooksEl, profilesEl, snapshotsEl];
+  var panels = [generalEl, webhooksEl, profilesEl, snapshotsEl, logsEl];
   for (var pi = 0; pi < panels.length; pi++) {
     if (panels[pi]) panels[pi].style.display = 'none';
   }
@@ -11629,12 +11694,137 @@ function switchSettingsTab(tab) {
     if (snapshotsEl) snapshotsEl.style.display = 'block';
     if (tabs[3]) tabs[3].classList.add('active');
     openSnapshotsTab();
+  } else if (tab === 'logs') {
+    if (logsEl) logsEl.style.display = 'block';
+    if (tabs[4]) tabs[4].classList.add('active');
+    openLogsTab();
   } else {
     if (generalEl) generalEl.style.display = 'block';
     if (tabs[0]) tabs[0].classList.add('active');
   }
 }
 
+
+// ── Logs Tab ────────────────────────────────────────────────
+
+var _logsCurrentPage = 1;
+var _logsCurrentLevel = '';
+var _logsCurrentSearch = '';
+
+function openLogsTab(page, level, search) {
+  var container = document.getElementById('logsTabContent');
+  if (!container) return;
+  if (page !== undefined) _logsCurrentPage = page;
+  if (level !== undefined) _logsCurrentLevel = level;
+  if (search !== undefined) _logsCurrentSearch = search;
+
+  var p = _logsCurrentPage || 1;
+  var lv = _logsCurrentLevel || '';
+  var s = _logsCurrentSearch || '';
+
+  var url = '/api/logs?page=' + p + '&limit=50';
+  if (lv) url += '&level=' + encodeURIComponent(lv);
+  if (s) url += '&search=' + encodeURIComponent(s);
+
+  if (p === 1 && !lv && !s) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--txt3)">Lade Logs...</div>';
+  }
+
+  authFetch(url, { headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      renderLogsTab(data);
+    })
+    .catch(function(e) {
+      container.innerHTML = '<div style="color:var(--err);padding:12px">Fehler: ' + esc(e.message) + '</div>';
+    });
+}
+
+function renderLogsTab(data) {
+  var container = document.getElementById('logsTabContent');
+  if (!container) return;
+
+  var logs = data.logs || data.entries || data || [];
+  if (!Array.isArray(logs)) logs = [];
+  var pagination = data.pagination || {};
+  var totalPages = pagination.totalPages || pagination.pages || 1;
+  var currentPage = pagination.page || _logsCurrentPage || 1;
+
+  var html = '';
+
+  // Toolbar: Level-Filter + Suche + Export
+  html += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">';
+
+  // Level filter buttons
+  var levels = ['', 'info', 'warn', 'error'];
+  var levelLabels = ['Alle', 'Info', 'Warn', 'Error'];
+  var levelColors = ['var(--txt2)', 'var(--accent)', '#e8a735', 'var(--err)'];
+  for (var li = 0; li < levels.length; li++) {
+    var isActive = (_logsCurrentLevel || '') === levels[li];
+    html += '<button onclick="openLogsTab(1,\'' + levels[li] + '\')" style="' +
+      'padding:4px 12px;font-size:12px;border-radius:var(--radius-sm);cursor:pointer;' +
+      'border:1px solid ' + (isActive ? levelColors[li] : 'var(--border)') + ';' +
+      'background:' + (isActive ? levelColors[li] : 'var(--bg1)') + ';' +
+      'color:' + (isActive ? '#fff' : 'var(--txt2)') + ';' +
+      'font-weight:' + (isActive ? '600' : '400') +
+      '">' + levelLabels[li] + '</button>';
+  }
+
+  // Search field
+  html += '<input type="text" id="logsSearchInput" placeholder="Suche..." value="' + esc(_logsCurrentSearch || '') + '" ' +
+    'onkeydown="if(event.key===\'Enter\'){openLogsTab(1,undefined,this.value)}" ' +
+    'style="flex:1;min-width:120px;padding:5px 10px;font-size:12px;background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--txt);font-family:var(--mono)">';
+
+  // Search button
+  html += '<button onclick="openLogsTab(1,undefined,document.getElementById(\'logsSearchInput\').value)" ' +
+    'style="padding:4px 10px;font-size:12px;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border);background:var(--bg1);color:var(--txt2)">Suchen</button>';
+
+  // Export button
+  html += '<button onclick="window.open(\'/api/logs/export\',\'_blank\')" ' +
+    'style="padding:4px 10px;font-size:12px;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;font-weight:600">Export JSONL</button>';
+
+  html += '</div>';
+
+  // Log entries
+  if (logs.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--txt3)">Keine Logs gefunden.</div>';
+  } else {
+    html += '<div style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg1)">';
+    for (var i = 0; i < logs.length; i++) {
+      var log = logs[i];
+      var lvl = (log.level || 'info').toLowerCase();
+      var lvlColor = lvl === 'error' ? 'var(--err)' : lvl === 'warn' ? '#e8a735' : 'var(--accent)';
+      var ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : '';
+      var msg = log.message || log.msg || JSON.stringify(log);
+      var cat = log.category || '';
+
+      html += '<div style="padding:6px 10px;border-bottom:1px solid var(--border);font-size:12px;font-family:var(--mono);display:flex;gap:8px;align-items:baseline">';
+      html += '<span style="color:var(--txt3);min-width:140px;flex-shrink:0">' + esc(ts) + '</span>';
+      html += '<span style="color:' + lvlColor + ';min-width:42px;font-weight:600;text-transform:uppercase;flex-shrink:0">' + esc(lvl) + '</span>';
+      if (cat) {
+        html += '<span style="color:var(--txt3);min-width:60px;flex-shrink:0">[' + esc(cat) + ']</span>';
+      }
+      html += '<span style="color:var(--txt);word-break:break-all">' + esc(msg) + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Pagination
+  if (totalPages > 1) {
+    html += '<div style="display:flex;justify-content:center;gap:6px;margin-top:10px;align-items:center">';
+    if (currentPage > 1) {
+      html += '<button onclick="openLogsTab(' + (currentPage - 1) + ')" style="padding:3px 10px;font-size:12px;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border);background:var(--bg1);color:var(--txt2)">&laquo; Zurueck</button>';
+    }
+    html += '<span style="font-size:12px;color:var(--txt3)">Seite ' + currentPage + ' / ' + totalPages + '</span>';
+    if (currentPage < totalPages) {
+      html += '<button onclick="openLogsTab(' + (currentPage + 1) + ')" style="padding:3px 10px;font-size:12px;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border);background:var(--bg1);color:var(--txt2)">Weiter &raquo;</button>';
+    }
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
 
 // ── Config-Profiles Tab ──────────────────────────────────────
 

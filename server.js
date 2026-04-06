@@ -249,7 +249,7 @@ const sseIdleCheckInterval = setInterval(() => {
   const now = Date.now();
   for (const [id, client] of clients) {
     if (now - client.lastActivity > 300000) { // 5 Minuten
-      try { client.res.end(); } catch {}
+      try { client.res.end(); } catch { /* best-effort, Client evtl. bereits getrennt */ }
       clients.delete(id);
     }
   }
@@ -290,7 +290,7 @@ wss.on('connection', (ws) => {
   // Aktuellen Zustand sofort senden
   try {
     ws.send(JSON.stringify({ event: 'state', data: orchestrator.getState() }));
-  } catch {}
+  } catch { /* best-effort, WS-Client evtl. bereits getrennt */ }
 
   ws.on('pong', () => {
     ws._lastPong = Date.now();
@@ -436,7 +436,7 @@ app.get('/api/stream', (req, res) => {
 
   // Keep-alive Ping
   const ping = setInterval(() => {
-    try { res.write(': ping\n\n'); } catch {}
+    try { res.write(': ping\n\n'); } catch { /* best-effort, SSE-Client evtl. bereits getrennt */ }
   }, 30000);
 
   const id = ++clientIdCounter;
@@ -1247,7 +1247,7 @@ app.get('/api/projects', async (req, res) => {
       let state = null;
       try {
         state = JSON.parse(await fsp.readFile(path.join(dir, d, 'state.json'), 'utf8'));
-      } catch {}
+      } catch (e) { logger.debug('state.json nicht lesbar', { project: d, error: e.message }); }
       return {
         id: d,
         title: state?.projectTitle || d,
@@ -1360,10 +1360,10 @@ app.get('/api/disk-usage', apiReadLimiter, async (req, res) => {
         if (e.isDirectory()) {
           size += await getDirSize(full);
         } else {
-          try { size += (await fsp.stat(full)).size; } catch {}
+          try { size += (await fsp.stat(full)).size; } catch { /* best-effort, Datei evtl. zwischenzeitlich geloescht */ }
         }
       }
-    } catch {}
+    } catch { /* best-effort, Verzeichnis evtl. nicht lesbar */ }
     return size;
   }
 
@@ -2060,7 +2060,7 @@ app.get('/api/stats', apiReadLimiter, async (req, res) => {
           totalFiles += state.projectStats.totalFiles || 0;
           totalLines += state.projectStats.totalLines || 0;
         }
-      } catch {}
+      } catch (e) { logger.debug('Projekt-Statistik nicht lesbar', { project: d, error: e.message }); }
     }));
 
     res.json({
@@ -3572,7 +3572,7 @@ app.get('/api/performance/agents', apiReadLimiter, async (req, res) => {
             linesOfCode: (agent.stats && agent.stats.linesOfCode) || 0
           });
         });
-      } catch {}
+      } catch (e) { logger.debug('Agent-Performance nicht lesbar', { project: d, error: e.message }); }
     }));
 
     res.json(agentStats);
@@ -3965,7 +3965,14 @@ const server = app.listen(PORT, () => {
   console.log(`  Node:     ${process.version}`);
   console.log(`  Projekte: ${path.join(__dirname, 'projects')}`);
   console.log('');
-  logger.info('Server gestartet', { port: PORT, ws: true });
+  logger.info('Server gestartet', {
+    port: PORT,
+    ws: true,
+    node: process.version,
+    projectDir: path.join(__dirname, 'projects'),
+    url: `http://localhost:${PORT}`,
+    wsUrl: `ws://localhost:${PORT}/ws`
+  });
 });
 
 // ── WebSocket Upgrade-Handler ─────────────────────────────────
@@ -4007,15 +4014,15 @@ function gracefulShutdown(signal) {
       }
       orchestrator._abortController.abort();
       for (const proc of orchestrator._activeProcesses) {
-        try { proc.kill('SIGTERM'); } catch {}
+        try { proc.kill('SIGTERM'); } catch { /* best-effort, Prozess evtl. bereits beendet */ }
       }
       orchestrator._activeProcesses.clear();
     }
     orchestrator._saveStateImmediate().catch(() => {});
-  } catch {}
+  } catch { /* best-effort, Shutdown darf nicht fehlschlagen */ }
   // SSE-Clients schliessen
   for (const [, client] of clients) {
-    try { client.res.end(); } catch {}
+    try { client.res.end(); } catch { /* best-effort, Client evtl. bereits getrennt */ }
   }
   clients.clear();
   // WebSocket-Clients schliessen
@@ -4024,7 +4031,7 @@ function gracefulShutdown(signal) {
   clearInterval(wsHeartbeat);
   wss.close();
   for (const ws of wsClients) {
-    try { ws.close(1001, 'Server wird heruntergefahren'); } catch {}
+    try { ws.close(1001, 'Server wird heruntergefahren'); } catch { /* best-effort */ }
   }
   wsClients.clear();
   if (batchTimer) { clearTimeout(batchTimer); batchTimer = null; }
@@ -4042,12 +4049,12 @@ module.exports = { server, wss, cleanup: () => {
   clearInterval(wsHeartbeat);
   if (batchTimer) { clearTimeout(batchTimer); batchTimer = null; }
   for (const [, client] of clients) {
-    try { client.res.end(); } catch {}
+    try { client.res.end(); } catch { /* best-effort */ }
   }
   clients.clear();
   wss.close();
   for (const ws of wsClients) {
-    try { ws.close(1001, 'Test-Cleanup'); } catch {}
+    try { ws.close(1001, 'Test-Cleanup'); } catch { /* best-effort */ }
   }
   wsClients.clear();
   return new Promise(resolve => server.close(resolve));

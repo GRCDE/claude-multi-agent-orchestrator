@@ -303,7 +303,7 @@ function _runClaudeWithRetry(prompt, workDir, emitter, activeProcesses, signal, 
       cleanup();
       proc.kill('SIGTERM');
       // Fallback: nach 5s SIGKILL
-      setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 5000);
+      setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* best-effort, Prozess evtl. bereits beendet */ } }, 5000);
       reject(new Error('Abgebrochen'));
     };
     if (signal) {
@@ -436,7 +436,7 @@ function _runClaudeWithRetry(prompt, workDir, emitter, activeProcesses, signal, 
       cleanup();
       if (signal) signal.removeEventListener('abort', onAbort);
       proc.kill('SIGTERM');
-      setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 5000);
+      setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* best-effort, Prozess evtl. bereits beendet */ } }, 5000);
       logger.error('Agent-Timeout erreicht', { timeoutSec, workDir });
       if (emitter) {
         emitter.emit('agent_timeout', {
@@ -743,8 +743,8 @@ class Orchestrator extends EventEmitter {
     this._abortController.abort();
     this._abortController = new AbortController();
     for (const proc of this._activeProcesses) {
-      try { proc.kill('SIGTERM'); } catch {}
-      setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 5000);
+      try { proc.kill('SIGTERM'); } catch { /* best-effort, Prozess evtl. bereits beendet */ }
+      setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* best-effort, Prozess evtl. bereits beendet */ } }, 5000);
     }
     this._activeProcesses.clear();
 
@@ -2765,10 +2765,10 @@ Antworte NUR mit validem JSON:
             const filePath = path.join(dir, entry.name);
             const stat = fs.statSync(filePath);
             snapshot[entry.name] = { size: stat.size, mtime: stat.mtimeMs };
-          } catch {}
+          } catch { /* best-effort, Datei evtl. zwischenzeitlich geloescht */ }
         }
       }
-    } catch {}
+    } catch { /* best-effort, Verzeichnis evtl. nicht lesbar */ }
     return snapshot;
   }
 
@@ -2809,7 +2809,7 @@ Antworte NUR mit validem JSON:
     try {
       const convContent = await fsp.readFile(path.join(agentDir, 'conversation.jsonl'), 'utf-8');
       for (const line of convContent.trim().split('\n').filter(Boolean)) {
-        try { const m = JSON.parse(line); if (m.from === 'agent' && m.text) responseLength += m.text.length; } catch {}
+        try { const m = JSON.parse(line); if (m.from === 'agent' && m.text) responseLength += m.text.length; } catch { /* ungueltige JSONL-Zeile ignoriert */ }
       }
     } catch (e) { logger.warn('Dateioperation fehlgeschlagen', { error: e.message }); }
     return { filesCreated, totalFileSize, linesOfCode, responseLength };
@@ -3585,8 +3585,8 @@ Orchestrator.prototype.abort = async function() {
 
   // Alle laufenden Prozesse beenden
   for (const proc of this._activeProcesses) {
-    try { proc.kill('SIGTERM'); } catch {}
-    setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 5000);
+    try { proc.kill('SIGTERM'); } catch { /* best-effort, Prozess evtl. bereits beendet */ }
+    setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* best-effort, Prozess evtl. bereits beendet */ } }, 5000);
   }
   this._activeProcesses.clear();
 
@@ -3664,7 +3664,7 @@ Orchestrator.prototype.resume = async function(projectId) {
             } else if (msg.from === 'coordinator' && msg.text) {
               historyText += `\nKoordinator antwortet: ${msg.text}\n`;
             }
-          } catch {}
+          } catch { /* ungueltige JSONL-Zeile ignoriert */ }
         }
       }
     } catch (e) { logger.warn('Dateioperation fehlgeschlagen', { error: e.message }); }
