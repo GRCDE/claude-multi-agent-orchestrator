@@ -286,6 +286,18 @@
   .file-size { flex-shrink: 0; font-size: 10px; color: var(--txt3); font-family: var(--mono); }
   .file-tree-empty { font-size: 11.5px; color: var(--txt3); font-style: italic; padding: 4px 0; }
 
+  /* ── Approval screen ─────────────────────────────────── */
+  .approval-box { max-width: 720px; margin: 2rem auto; }
+  .approval-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .approval-summary { font-size: 13px; color: var(--txt2); margin-bottom: 1.25rem; line-height: 1.6; }
+  .approval-task { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px; }
+  .approval-task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .approval-task-num { font-size: 11px; color: var(--txt3); font-weight: 500; }
+  .approval-task-title { font-size: 13px; font-weight: 600; }
+  .approval-task textarea { min-height: 60px; font-size: 12px; margin-top: 4px; }
+  .approval-task-del { font-size: 11px; color: var(--txt3); margin-top: 4px; }
+  .approval-actions { display: flex; gap: 10px; margin-top: 1rem; }
+
   /* ── Mobile responsive ─────────────────────────────────── */
   @media (max-width: 768px) {
     #app { padding: 1rem; }
@@ -395,6 +407,7 @@ function connect() {
     if (d.startedAt) state.startedAt = d.startedAt;
     if (d.totalDuration != null) { state.totalDuration = d.totalDuration; state.completedAt = Date.now(); }
     if (d.phase === 'running') { startElapsedTimer(); if (fileTreeOpen) startFileTreePolling(); }
+    if (d.phase === 'awaiting_approval') { stopElapsedTimer(); }
     if (d.phase === 'complete' || d.phase === 'error') { stopElapsedTimer(); if (fileTreeOpen) loadFileTree(); }
     render();
   });
@@ -425,6 +438,12 @@ function connect() {
     }
     updateAgent(idx);
     updateProgressBar();
+  });
+
+  es.addEventListener('agents_updated', function(e) {
+    var d = JSON.parse(e.data);
+    state.agents = d.agents || [];
+    render();
   });
 
   es.addEventListener('agent_stream', function(e) {
@@ -491,6 +510,7 @@ function applyState(s) {
   state.startedAt = s.startedAt || null;
   state.completedAt = s.completedAt || null;
   state.totalDuration = s.totalDuration || null;
+  state.tasks = s.tasks || [];
 }
 
 // ── Banner Management ────────────────────────────────────────
@@ -527,6 +547,7 @@ var BADGE_MAP = {
   planning: ['Plant\u2026',   '#EEEDFE','#534AB7', true],
   ready:    ['Bereit',   '#E1F5EE','#0F6E56', false],
   thinking: ['Denkt\u2026',  '#EEEDFE','#534AB7', true],
+  awaiting_approval: ['Pr\u00FCfung', '#FAEEDA','#854F0B', false],
   waiting:  ['Wartend',  '#F1EFE8','#888780', false],
   working:  ['Arbeitet', '#E6F1FB','#185FA5', true],
   asking:   ['Fragt\u2026',   '#FAEEDA','#854F0B', true],
@@ -594,6 +615,8 @@ function render() {
   if (state.phase === 'setup' || state.phase === 'idle') {
     app.innerHTML = renderSetup();
     loadHistory();
+  } else if (state.phase === 'awaiting_approval') {
+    app.innerHTML = renderApproval();
   } else {
     app.innerHTML = renderDashboard();
     renderBanners();
@@ -705,8 +728,86 @@ function renderSetup() {
       '</div>' +
       '<button class="btn-primary" id="startBtn" onclick="startProject()">Projekt starten</button>' +
     '</div>' +
+    '<div class="field" style="margin-top:10px">' +
+      '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">' +
+        '<input type="checkbox" id="approvalCheck"> Plan vor Start pr\u00FCfen' +
+      '</label>' +
+    '</div>' +
     '<div id="historyArea" class="history-list"></div>' +
   '</div>';
+}
+
+// ── Render: Approval ──────────────────────────────────────────
+function renderApproval() {
+  var agents = state.agents || [];
+  var html = '<div class="card approval-box">' +
+    '<div class="approval-title">' + esc(state.projectTitle || 'Plan pr\u00FCfen') + '</div>' +
+    (state.projectSummary ? '<div class="approval-summary">' + esc(state.projectSummary) + '</div>' : '') +
+    '<div class="section-label">Geplante Aufgaben (' + esc(String(agents.length)) + ')</div>';
+
+  agents.forEach(function(a, i) {
+    html += '<div class="approval-task" data-approval-idx="' + i + '">' +
+      '<div class="approval-task-header">' +
+        '<span class="approval-task-num">Agent ' + esc(String(i + 1)) + (a.role ? ' \u2013 ' + esc(a.role) : '') + '</span>' +
+      '</div>' +
+      '<div class="approval-task-title">' + esc(a.title || '') + '</div>' +
+      '<textarea class="approval-task-edit" id="approvalTask' + i + '">' + esc(a.task || '') + '</textarea>' +
+      '<div class="approval-task-del">Lieferergebnis: ' + esc(a.deliverable || '') + '</div>' +
+    '</div>';
+  });
+
+  html += '<div class="approval-actions">' +
+    '<button class="btn-primary" onclick="approvePlan()">Genehmigen &amp; Starten</button>' +
+    '<button class="btn-outline" onclick="modifyAndApprove()">Bearbeiten &amp; Starten</button>' +
+    '<button class="btn-outline" onclick="resetProject()">Abbrechen</button>' +
+  '</div></div>';
+
+  return html;
+}
+
+async function approvePlan() {
+  try {
+    var r = await fetch('/api/approve', { method: 'POST' });
+    if (!r.ok) {
+      var d = await r.json();
+      addBanner('error', d.error || 'Genehmigung fehlgeschlagen');
+    }
+  } catch (e) {
+    addBanner('error', 'Fehler: ' + e.message);
+  }
+}
+
+async function modifyAndApprove() {
+  var agents = state.agents || [];
+  var tasks = agents.map(function(a, i) {
+    var textarea = document.getElementById('approvalTask' + i);
+    return {
+      title: a.title || '',
+      task: textarea ? textarea.value.trim() : (a.task || ''),
+      deliverable: a.deliverable || '',
+      role: a.role || ''
+    };
+  });
+  // Validierung
+  for (var i = 0; i < tasks.length; i++) {
+    if (!tasks[i].task) {
+      addBanner('error', 'Aufgabe f\u00FCr Agent ' + (i + 1) + ' darf nicht leer sein.');
+      return;
+    }
+  }
+  try {
+    var r = await fetch('/api/modify-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks: tasks })
+    });
+    if (!r.ok) {
+      var d = await r.json();
+      addBanner('error', d.error || '\u00C4nderung fehlgeschlagen');
+    }
+  } catch (e) {
+    addBanner('error', 'Fehler: ' + e.message);
+  }
 }
 
 // ── Render: Dashboard ────────────────────────────────────────
@@ -1037,10 +1138,13 @@ async function startProject() {
     }
     render();
 
+    var approvalEl = document.getElementById('approvalCheck');
+    var requireApproval = approvalEl ? approvalEl.checked : false;
+
     await fetch('/api/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description: desc, agentCount: count })
+      body: JSON.stringify({ description: desc, agentCount: count, requireApproval: requireApproval })
     });
   } catch (e) {
     addBanner('error', 'Fehler beim Starten: ' + e.message);

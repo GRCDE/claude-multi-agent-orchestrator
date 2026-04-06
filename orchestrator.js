@@ -346,6 +346,7 @@ class Orchestrator extends EventEmitter {
     this.startedAt = null;
     this.completedAt = null;
     this.totalDuration = null;
+    this._approvalResolver = null;
   }
 
   emit(event, data) {
@@ -359,6 +360,7 @@ class Orchestrator extends EventEmitter {
       projectId: this.projectId,
       projectTitle: this.projectTitle,
       projectSummary: this.projectSummary,
+      tasks: this.tasks,
       coordinator: {
         status: this.coordStatus,
         summary: this.projectSummary,
@@ -390,8 +392,46 @@ class Orchestrator extends EventEmitter {
     }
   }
 
+  // ── Plan genehmigen ──────────────────────────────────────
+  approvePlan() {
+    if (this.phase !== 'awaiting_approval' || !this._approvalResolver) {
+      throw new Error('Kein Plan wartet auf Genehmigung');
+    }
+    this._approvalResolver();
+    this._approvalResolver = null;
+  }
+
+  // ── Plan modifizieren und genehmigen ────────────────────
+  modifyPlan(tasks) {
+    if (this.phase !== 'awaiting_approval' || !this._approvalResolver) {
+      throw new Error('Kein Plan wartet auf Genehmigung');
+    }
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+      throw new Error('Tasks müssen ein nicht-leeres Array sein');
+    }
+    // Validierung der modifizierten Tasks
+    for (let i = 0; i < tasks.length; i++) {
+      const t = tasks[i];
+      if (!t.title || !t.task || !t.deliverable) {
+        throw new Error(`Task ${i + 1} fehlt title, task oder deliverable`);
+      }
+    }
+    // Tasks aktualisieren
+    this.tasks = tasks;
+    // Agents-Array anpassen
+    this.agents = tasks.map((task, i) => ({
+      id: i, title: task.title, task: task.task, deliverable: task.deliverable,
+      role: task.role || '', status: 'waiting', conversation: [], rounds: 0,
+      questions: 0, startTime: null, endTime: null, duration: null,
+      workDir: path.join(this.projectDir, `agent-${i + 1}`)
+    }));
+    this.emit('agents_updated', { agents: this.agents });
+    this._approvalResolver();
+    this._approvalResolver = null;
+  }
+
   // ── Start project ─────────────────────────────────────────
-  async start(desc, agentCount) {
+  async start(desc, agentCount, requireApproval) {
     this.reset();
 
     // CLI-Check bevor wir starten
@@ -465,6 +505,32 @@ class Orchestrator extends EventEmitter {
       await this._runHook('onError', { phase: 'planning', error: e });
       await this._saveState();
       return;
+    }
+
+    // Schritt 1.5: Optional auf Genehmigung warten
+    if (requireApproval) {
+      this.phase = 'awaiting_approval';
+      this.emit('phase', { phase: 'awaiting_approval' });
+      await this._saveState();
+      await new Promise(resolve => { this._approvalResolver = resolve; });
+      // Nach Genehmigung: Agent-Verzeichnisse und task.md ggf. neu erstellen (bei modifiziertem Plan)
+      for (let i = 0; i < this.tasks.length; i++) {
+        const task = this.tasks[i];
+        const agentDir = path.join(this.projectDir, `agent-${i + 1}`);
+        validateWorkDir(agentDir);
+        try {
+          await fsp.mkdir(agentDir, { recursive: true });
+          await fsp.writeFile(path.join(agentDir, 'task.md'),
+            `# Agent ${i + 1}: ${task.title}\n\n## Aufgabe\n${task.task}\n\n## Lieferergebnis\n${task.deliverable}\n`);
+        } catch (e) {
+          if (e.code === 'ENOSPC') throw new Error('Kein Speicherplatz mehr verfügbar');
+          throw e;
+        }
+        this._patchAgent(i, { title: task.title, task: task.task, deliverable: task.deliverable, role: task.role || '', workDir: agentDir });
+      }
+      this.phase = 'running';
+      this.emit('phase', { phase: 'running', startedAt: this.startedAt });
+      await this._saveState();
     }
 
     // Schritt 2: Agenten parallel ausführen (mit Semaphore)

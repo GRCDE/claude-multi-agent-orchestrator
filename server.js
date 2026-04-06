@@ -129,11 +129,11 @@ let isStarting = false;
 
 // Projekt starten (mit Input-Validierung + Race-Condition Fix)
 app.post('/api/start', startLimiter, async (req, res) => {
-  if (isStarting || orchestrator.phase === 'running') {
+  if (isStarting || orchestrator.phase === 'running' || orchestrator.phase === 'awaiting_approval') {
     return res.status(409).json({ error: 'Projekt läuft bereits' });
   }
 
-  const { description, agentCount } = req.body;
+  const { description, agentCount, requireApproval } = req.body;
 
   // Input-Validierung
   if (!description || typeof description !== 'string') {
@@ -154,7 +154,7 @@ app.post('/api/start', startLimiter, async (req, res) => {
     res.json({ ok: true, message: 'Projekt gestartet' });
 
     // Async starten (non-blocking)
-    orchestrator.start(description, count).catch(e => {
+    orchestrator.start(description, count, !!requireApproval).catch(e => {
       logger.error('Projekt-Fehler', { error: e.message });
       broadcast('error', { message: e.message });
     }).finally(() => {
@@ -294,6 +294,29 @@ app.get('/api/export/:id', (req, res) => {
   archive.pipe(res);
   archive.directory(dir, req.params.id);
   archive.finalize();
+});
+
+// ── Plan Genehmigung ─────────────────────────────────────────
+app.post('/api/approve', apiLimiter, (req, res) => {
+  try {
+    orchestrator.approvePlan();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.post('/api/modify-plan', apiLimiter, (req, res) => {
+  try {
+    const { tasks } = req.body;
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+      return res.status(400).json({ error: 'Tasks müssen ein nicht-leeres Array sein' });
+    }
+    orchestrator.modifyPlan(tasks);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // ── Agent Retry ──────────────────────────────────────────────
