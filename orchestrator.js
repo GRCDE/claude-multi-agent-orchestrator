@@ -752,6 +752,7 @@ class Orchestrator extends EventEmitter {
     this.projectDir = null;
     this.projectDesc = '';
     this.projectTitle = '';
+    this.tags = [];
     this.projectSummary = '';
     this.tasks = [];
     this._lastMergeResult = null;
@@ -842,6 +843,7 @@ class Orchestrator extends EventEmitter {
       projectTitle: this.projectTitle,
       projectSummary: this.projectSummary,
       projectDesc: this.projectDesc || '',
+      tags: this.tags || [],
       tasks: this.tasks,
       coordinator: {
         status: this.coordStatus,
@@ -1050,6 +1052,7 @@ class Orchestrator extends EventEmitter {
     this.projectDesc = checkpointData.projectDesc || (checkpointData._checkpoint ? checkpointData._checkpoint.projectDesc : '') || '';
     this.projectTitle = checkpointData.projectTitle || '';
     this.projectSummary = checkpointData.projectSummary || '';
+    this.tags = checkpointData.tags || [];
     this.tasks = checkpointData.tasks || [];
     this.startedAt = checkpointData.startedAt || Date.now();
     this.phase = 'running';
@@ -1149,7 +1152,7 @@ class Orchestrator extends EventEmitter {
   }
 
   // ── Start project ─────────────────────────────────────────
-  async start(desc, agentCount, requireApproval) {
+  async start(desc, agentCount, requireApproval, options = {}) {
     this.reset();
 
     // CLI-Check bevor wir starten (Verfügbarkeit + Versions-Kompatibilität)
@@ -1161,6 +1164,14 @@ class Orchestrator extends EventEmitter {
       this.emit('phase', { phase: 'error', error: errorMsg });
       this.emit('error', { message: errorMsg, type: 'cli_not_found' });
       return;
+    }
+
+    // Tags uebernehmen (optional, Array von Strings, max 10, je max 30 Zeichen)
+    if (Array.isArray(options.tags)) {
+      this.tags = options.tags
+        .filter(t => typeof t === 'string' && t.trim())
+        .map(t => t.trim().toLowerCase().slice(0, 30))
+        .slice(0, 10);
     }
 
     // Input sanitieren
@@ -3474,6 +3485,7 @@ Orchestrator.prototype.loadProject = function(projectId) {
   this.projectDesc = state.projectDesc || '';
   this.projectTitle = state.projectTitle || '';
   this.projectSummary = state.projectSummary || '';
+  this.tags = state.tags || [];
   this.tasks = state.tasks || [];
   this.agents = state.agents || [];
   this.coordLog = (state.coordinator && state.coordinator.log) || [];

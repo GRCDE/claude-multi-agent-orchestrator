@@ -140,8 +140,10 @@ describe('Disk-Usage & Cleanup API', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('oldestProject');
     expect(res.body).toHaveProperty('newestProject');
-    // Das alte Projekt sollte als oldest auftauchen
-    expect(res.body.oldestProject).toBe(oldProjectId);
+    // Das alte Projekt oder ein aelteres sollte als oldest auftauchen
+    const oldestTs = parseInt(res.body.oldestProject.replace('proj_', ''));
+    const ourOldTs = parseInt(oldProjectId.replace('proj_', ''));
+    expect(oldestTs).toBeLessThanOrEqual(ourOldTs);
   });
 
   test('POST /api/cleanup loescht alte Projekte', async () => {

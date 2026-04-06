@@ -17,6 +17,7 @@ const { router: healthRouter, init: initHealth } = require('./src/routes/health'
 const { router: agentsRouter, init: initAgents } = require('./src/routes/agents');
 const { router: queueRouter, init: initQueue, projectQueue, MAX_QUEUE_SIZE, sortQueueByPriority, broadcastQueueUpdate, validateStartInput } = require('./src/routes/queue');
 const { router: configRouter, init: initConfig } = require('./src/routes/config');
+const { router: filesRouter, init: initFiles } = require('./src/routes/files');
 
 const compression = require('compression');
 const orchestrator = new Orchestrator();
@@ -483,11 +484,11 @@ app.get('/api/stream', (req, res) => {
 // ── Race-Condition Schutz ────────────────────────────────────
 let isStarting = false;
 
-function startProject(description, agentCount, requireApproval) {
+function startProject(description, agentCount, requireApproval, options = {}) {
   isStarting = true;
   queueRouter._currentProjectStartedAt = Date.now();
   const count = parseInt(agentCount);
-  orchestrator.start(description, count, !!requireApproval).catch(e => {
+  orchestrator.start(description, count, !!requireApproval, options).catch(e => {
     logger.error('Projekt-Fehler', { error: e.message });
     broadcast('error', { message: e.message });
   }).finally(() => {
@@ -520,6 +521,29 @@ initTemplates({
 });
 app.use('/api', templatesRouter);
 
+// ── Health/Logs/Recovery-Router initialisieren und mounten ───
+initHealth({
+  orchestrator,
+  Orchestrator: require('./orchestrator'),
+  logger,
+  authMiddleware,
+  apiLimiter,
+  exportLimiter,
+  logBuffer,
+  exportAllLogs,
+  getLogFiles,
+  clients,
+  wsClients,
+  isStartingFn: () => isStarting,
+  setIsStarting: (v) => { isStarting = v; },
+  broadcast,
+});
+app.use(healthRouter);
+
+// ── Files/Docs/i18n/Roles/Batch-Router initialisieren und mounten ───
+initFiles({ orchestrator, logger, authMiddleware, apiLimiter, apiReadLimiter, app, PORT });
+app.use('/api', filesRouter);
+
 // ── Projekt-Historie ─────────────────────────────────────────
 
 // Alle Projekte auflisten
@@ -551,12 +575,17 @@ app.get('/api/projects', async (req, res) => {
         completedAt: state?.completedAt || null,
         projectStats: state?.projectStats || null,
         projectScore: state?.projectScore || null,
-        totalTokenUsage: state?.totalTokenUsage || null
+        totalTokenUsage: state?.totalTokenUsage || null,
+        archived: state?.archived || false
       };
     }));
 
-    projects.sort((a, b) => b.createdAt - a.createdAt);
-    res.json(projects);
+    // Archivierte standardmaessig ausblenden
+    const includeArchived = req.query.includeArchived === 'true';
+    const filtered = includeArchived ? projects : projects.filter(p => !p.archived);
+
+    filtered.sort((a, b) => b.createdAt - a.createdAt);
+    res.json(filtered);
   } catch (e) {
     logger.error('Projektliste lesen fehlgeschlagen', { error: e.message });
     res.status(500).json({ error: 'Projektliste konnte nicht gelesen werden' });
@@ -599,6 +628,39 @@ app.delete('/api/projects/:id', authMiddleware, apiLimiter, async (req, res) => 
   } catch (e) {
     logger.error('Projekt löschen fehlgeschlagen', { id, error: e.message });
     res.status(500).json({ error: 'Löschen fehlgeschlagen: ' + e.message });
+  }
+});
+
+// ── Projekt archivieren / dearchivieren ────────────────────
+app.post('/api/projects/:id/archive', authMiddleware, apiLimiter, async (req, res) => {
+  const id = req.params.id;
+  if (!id.startsWith('proj_')) return res.status(400).json({ error: 'Ungültige Projekt-ID' });
+  const stateFile = path.join(__dirname, 'projects', id, 'state.json');
+  if (!stateFile.startsWith(path.join(__dirname, 'projects'))) return res.status(400).json({ error: 'Ungültiger Pfad' });
+  try {
+    const data = JSON.parse(await fsp.readFile(stateFile, 'utf8'));
+    data.archived = true;
+    await fsp.writeFile(stateFile, JSON.stringify(data, null, 2), 'utf8');
+    logger.info('Projekt archiviert', { id });
+    res.json({ ok: true, id, archived: true });
+  } catch {
+    res.status(404).json({ error: 'Projekt nicht gefunden' });
+  }
+});
+
+app.post('/api/projects/:id/unarchive', authMiddleware, apiLimiter, async (req, res) => {
+  const id = req.params.id;
+  if (!id.startsWith('proj_')) return res.status(400).json({ error: 'Ungültige Projekt-ID' });
+  const stateFile = path.join(__dirname, 'projects', id, 'state.json');
+  if (!stateFile.startsWith(path.join(__dirname, 'projects'))) return res.status(400).json({ error: 'Ungültiger Pfad' });
+  try {
+    const data = JSON.parse(await fsp.readFile(stateFile, 'utf8'));
+    delete data.archived;
+    await fsp.writeFile(stateFile, JSON.stringify(data, null, 2), 'utf8');
+    logger.info('Projekt dearchiviert', { id });
+    res.json({ ok: true, id, archived: false });
+  } catch {
+    res.status(404).json({ error: 'Projekt nicht gefunden' });
   }
 });
 
@@ -846,6 +908,124 @@ app.get('/api/export-markdown/:id', exportLimiter, async (req, res) => {
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="' + fileName + '"');
   res.send(md);
+});
+
+// ── PDF Export (druckfreundliches HTML) ──────────────────────
+app.get('/api/export-pdf/:id', exportLimiter, async (req, res) => {
+  const id = req.params.id;
+  const loaded = await loadProjectState(id);
+  if (!loaded) return res.status(404).json({ error: 'Projekt nicht gefunden' });
+  const { state } = loaded;
+
+  const statusLabels = {
+    done: 'Fertig', error: 'Fehler', working: 'In Arbeit',
+    waiting: 'Wartend', asking: 'Fragt Koordinator'
+  };
+
+  function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function fmtDur(seconds) {
+    if (!seconds) return 'k.A.';
+    if (seconds < 60) return seconds + 's';
+    return Math.floor(seconds / 60) + 'min ' + (seconds % 60) + 's';
+  }
+
+  const title = escHtml(state.projectTitle || 'Projekt');
+  const summary = escHtml(state.projectSummary || (state.coordinator && state.coordinator.summary) || '');
+  const created = state.startedAt ? new Date(state.startedAt).toLocaleString('de-DE') : 'k.A.';
+  const duration = fmtDur(state.totalDuration);
+
+  const tokens = state.totalTokens || state.tokenUsage || {};
+  const inputTokens = tokens.input || tokens.inputTokens || 0;
+  const outputTokens = tokens.output || tokens.outputTokens || 0;
+  const totalTokens = inputTokens + outputTokens;
+
+  let agentRows = '';
+  for (let i = 0; i < (state.agents || []).length; i++) {
+    const a = state.agents[i];
+    const score = (a.score && a.score.overall != null) ? a.score.overall + '/100' : 'k.A.';
+    const st = statusLabels[a.status] || a.status || 'k.A.';
+    const statusClass = a.status === 'done' ? 'status-done' : (a.status === 'error' ? 'status-error' : '');
+    agentRows += '<tr>' +
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + escHtml(a.title || 'Agent ' + (i + 1)) + '</td>' +
+      '<td>' + escHtml(a.role || 'k.A.') + '</td>' +
+      '<td class="' + statusClass + '">' + escHtml(st) + '</td>' +
+      '<td>' + escHtml(score) + '</td>' +
+      '<td>' + escHtml(fmtDur(a.duration)) + '</td>' +
+      '</tr>';
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1a1a1a; max-width: 800px; margin: 0 auto; padding: 24px; }
+  h1 { font-size: 1.6em; margin-bottom: 8px; }
+  .summary { color: #444; margin-bottom: 16px; line-height: 1.5; }
+  .meta { display: flex; gap: 24px; margin-bottom: 20px; font-size: 0.9em; color: #555; }
+  .meta span { background: #f0f0f0; padding: 4px 10px; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.9em; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #ddd; }
+  th { background: #f5f5f5; font-weight: 600; }
+  .status-done { color: #16a34a; font-weight: 600; }
+  .status-error { color: #dc2626; font-weight: 600; }
+  .section { margin-top: 28px; }
+  .section h2 { font-size: 1.15em; margin-bottom: 10px; border-bottom: 2px solid #e5e5e5; padding-bottom: 6px; }
+  .token-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .token-box { background: #f8f8f8; padding: 12px; border-radius: 6px; text-align: center; }
+  .token-box .val { font-size: 1.3em; font-weight: 700; }
+  .token-box .lbl { font-size: 0.8em; color: #666; margin-top: 2px; }
+  .print-btn { position: fixed; top: 16px; right: 16px; padding: 8px 18px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; }
+  .print-btn:hover { background: #1d4ed8; }
+  @media print {
+    .print-btn { display: none; }
+    body { padding: 0; }
+    @page { margin: 2cm; }
+  }
+  table tr { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">Als PDF drucken</button>
+<h1>${title}</h1>
+${summary ? '<p class="summary">' + summary + '</p>' : ''}
+<div class="meta">
+  <span>Erstellt: ${escHtml(created)}</span>
+  <span>Dauer: ${escHtml(duration)}</span>
+  <span>Agenten: ${(state.agents || []).length}</span>
+</div>
+
+<div class="section">
+  <h2>Token-Verbrauch</h2>
+  <div class="token-grid">
+    <div class="token-box"><div class="val">${totalTokens.toLocaleString('de-DE')}</div><div class="lbl">Gesamt</div></div>
+    <div class="token-box"><div class="val">${inputTokens.toLocaleString('de-DE')}</div><div class="lbl">Input</div></div>
+    <div class="token-box"><div class="val">${outputTokens.toLocaleString('de-DE')}</div><div class="lbl">Output</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Agenten</h2>
+  <table>
+    <thead><tr><th>#</th><th>Titel</th><th>Rolle</th><th>Status</th><th>Score</th><th>Dauer</th></tr></thead>
+    <tbody>${agentRows || '<tr><td colspan="6">Keine Agenten</td></tr>'}</tbody>
+  </table>
+</div>
+
+<div style="margin-top:32px;font-size:0.75em;color:#999;text-align:center;">
+  Claude Multi-Agent Orchestrator &mdash; Exportiert am ${new Date().toLocaleString('de-DE')}
+</div>
+</body>
+</html>`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
 });
 
 // ── Zusammengeführte Dateien ──────────────────────────────────

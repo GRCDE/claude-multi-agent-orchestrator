@@ -2,8 +2,12 @@
 // Prueft Dateibaum und Datei-Inhalt Modal
 
 'use strict';
+
+jest.setTimeout(60000);
+
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 
 const TEST_PORT = 3267;
 const BASE_URL = `http://localhost:${TEST_PORT}`;
@@ -71,6 +75,29 @@ jest.mock('../../orchestrator', () => {
   return MockOrchestrator;
 });
 
+// ── Hilfsfunktionen ──────────────────────────────────────────
+
+function isPortFree(port) {
+  return new Promise((resolve) => {
+    const req = http.get(`http://127.0.0.1:${port}/health`, (res) => {
+      res.resume();
+      resolve(false); // Port besetzt = nicht frei
+    });
+    req.on('error', () => resolve(true)); // Fehler = Port frei
+    req.setTimeout(1000, () => { req.destroy(); resolve(true); });
+  });
+}
+
+async function waitForServerReady(port, timeout = 15000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const free = await isPortFree(port);
+    if (!free) return; // Server antwortet
+    await new Promise(r => setTimeout(r, 300));
+  }
+  throw new Error(`Server did not become ready on port ${port} within ${timeout}ms`);
+}
+
 // ── Test Suite ────────────────────────────────────────────────
 
 let browser;
@@ -88,6 +115,19 @@ beforeAll(async () => {
     projectDir: PROJECT_DIR,
     agents: [{ index: 0, title: 'Test-Agent', status: 'done', task: 'Test-Aufgabe' }]
   }));
+
+  // Warten bis Port frei ist (EADDRINUSE vermeiden)
+  let portFree = await isPortFree(TEST_PORT);
+  if (!portFree) {
+    // Bis zu 10s warten bis Port frei wird
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 500));
+      portFree = await isPortFree(TEST_PORT);
+      if (portFree) break;
+    }
+    if (!portFree) throw new Error(`Port ${TEST_PORT} is still in use`);
+  }
 
   // Server starten
   process.env.PORT = String(TEST_PORT);
@@ -110,13 +150,13 @@ beforeAll(async () => {
     }
   }
 
-  // Warten bis Server bereit ist
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  // Warten bis Server tatsaechlich Requests annimmt
+  await waitForServerReady(TEST_PORT, 15000);
 
   // Browser starten
   const { chromium } = require('playwright');
   browser = await chromium.launch({ headless: true });
-}, 30000);
+}, 60000);
 
 afterAll(async () => {
   if (browser) await browser.close();

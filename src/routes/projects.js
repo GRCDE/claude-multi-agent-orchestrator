@@ -89,15 +89,57 @@ function init(deps) {
           completedAt: state?.completedAt || null,
           projectStats: state?.projectStats || null,
           projectScore: state?.projectScore || null,
-          totalTokenUsage: state?.totalTokenUsage || null
+          totalTokenUsage: state?.totalTokenUsage || null,
+          tags: state?.tags || [],
+          archived: state?.archived || false
         };
       }));
 
-      projects.sort((a, b) => b.createdAt - a.createdAt);
-      res.json(projects);
+      // Archivierte standardmaessig ausblenden
+      const includeArchived = req.query.includeArchived === 'true';
+      const filtered = includeArchived ? projects : projects.filter(p => !p.archived);
+
+      filtered.sort((a, b) => b.createdAt - a.createdAt);
+      res.json(filtered);
     } catch (e) {
       logger.error('Projektliste lesen fehlgeschlagen', { error: e.message });
       res.status(500).json({ error: 'Projektliste konnte nicht gelesen werden' });
+    }
+  });
+
+  // ── GET /api/tags ─────────────────────────────────────────────
+  router.get('/tags', async (req, res) => {
+    const dir = PROJECTS_DIR;
+    try { await fsp.access(dir); } catch { return res.json([]); }
+
+    try {
+      const entries = await fsp.readdir(dir);
+      const projDirs = entries.filter(d => d.startsWith('proj_'));
+      const tagCounts = {};
+
+      await Promise.all(projDirs.map(async (d) => {
+        try {
+          const raw = await fsp.readFile(path.join(dir, d, 'state.json'), 'utf8');
+          const state = JSON.parse(raw);
+          if (Array.isArray(state.tags)) {
+            for (const tag of state.tags) {
+              if (typeof tag === 'string' && tag.trim()) {
+                const t = tag.trim().toLowerCase();
+                tagCounts[t] = (tagCounts[t] || 0) + 1;
+              }
+            }
+          }
+        } catch { /* state.json nicht lesbar */ }
+      }));
+
+      const result = Object.entries(tagCounts)
+        .map(([tag, count]) => ({ tag, count }))
+        .sort((a, b) => b.count - a.count);
+
+      res.json(result);
+    } catch (e) {
+      logger.error('Tags aggregieren fehlgeschlagen', { error: e.message });
+      res.status(500).json({ error: 'Tags konnten nicht gelesen werden' });
     }
   });
 
@@ -137,6 +179,40 @@ function init(deps) {
     } catch (e) {
       logger.error('Projekt löschen fehlgeschlagen', { id, error: e.message });
       res.status(500).json({ error: 'Löschen fehlgeschlagen: ' + e.message });
+    }
+  });
+
+  // ── POST /api/projects/:id/archive ────────────────────────────
+  router.post('/projects/:id/archive', authMiddleware, apiLimiter, async (req, res) => {
+    const id = req.params.id;
+    if (!id.startsWith('proj_')) return res.status(400).json({ error: 'Ungültige Projekt-ID' });
+    const stateFile = path.join(PROJECTS_DIR, id, 'state.json');
+    if (!stateFile.startsWith(PROJECTS_DIR)) return res.status(400).json({ error: 'Ungültiger Pfad' });
+    try {
+      const data = JSON.parse(await fsp.readFile(stateFile, 'utf8'));
+      data.archived = true;
+      await fsp.writeFile(stateFile, JSON.stringify(data, null, 2), 'utf8');
+      logger.info('Projekt archiviert', { id });
+      res.json({ ok: true, id, archived: true });
+    } catch {
+      res.status(404).json({ error: 'Projekt nicht gefunden' });
+    }
+  });
+
+  // ── POST /api/projects/:id/unarchive ─────────────────────────
+  router.post('/projects/:id/unarchive', authMiddleware, apiLimiter, async (req, res) => {
+    const id = req.params.id;
+    if (!id.startsWith('proj_')) return res.status(400).json({ error: 'Ungültige Projekt-ID' });
+    const stateFile = path.join(PROJECTS_DIR, id, 'state.json');
+    if (!stateFile.startsWith(PROJECTS_DIR)) return res.status(400).json({ error: 'Ungültiger Pfad' });
+    try {
+      const data = JSON.parse(await fsp.readFile(stateFile, 'utf8'));
+      delete data.archived;
+      await fsp.writeFile(stateFile, JSON.stringify(data, null, 2), 'utf8');
+      logger.info('Projekt dearchiviert', { id });
+      res.json({ ok: true, id, archived: false });
+    } catch {
+      res.status(404).json({ error: 'Projekt nicht gefunden' });
     }
   });
 

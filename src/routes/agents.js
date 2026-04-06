@@ -27,7 +27,7 @@ function init(deps) {
 
   // ── Projekt starten (mit Input-Validierung + Race-Condition Fix + Queue) ──
   router.post('/start', authMiddleware, startLimiter, async (req, res) => {
-    const { description, agentCount, requireApproval, priority } = req.body;
+    const { description, agentCount, requireApproval, priority, tags } = req.body;
 
     // Input-Validierung
     const validationError = validateStartInput(req.body);
@@ -49,6 +49,7 @@ function init(deps) {
         agentCount: parseInt(agentCount),
         requireApproval: !!requireApproval,
         priority: validPrio,
+        tags: Array.isArray(tags) ? tags : [],
         queuedAt: Date.now()
       };
       projectQueue.push(newItem);
@@ -62,7 +63,7 @@ function init(deps) {
 
     try {
       res.json({ ok: true, message: 'Projekt gestartet' });
-      startProject(description, agentCount, requireApproval);
+      startProject(description, agentCount, requireApproval, { tags: Array.isArray(tags) ? tags : [] });
     } catch (e) {
       setIsStarting(false);
       logger.error('Start-Fehler', { error: e.message });

@@ -49,6 +49,25 @@ function init(deps) {
     }
   });
 
+  // GET /api/tags - Alle einzigartigen Tags aus Templates aggregieren
+  router.get('/tags', async (req, res) => {
+    try {
+      const data = await loadTemplatesFile();
+      const tagSet = new Set();
+      for (const t of data.templates) {
+        if (Array.isArray(t.tags)) {
+          for (const tag of t.tags) {
+            if (typeof tag === 'string' && tag.trim()) tagSet.add(tag.trim());
+          }
+        }
+      }
+      res.json({ tags: Array.from(tagSet).sort() });
+    } catch (e) {
+      logger.error('Tags laden fehlgeschlagen', { error: e.message });
+      res.status(500).json({ error: 'Tags konnten nicht geladen werden' });
+    }
+  });
+
   // POST /api/templates - Neues Template erstellen
   router.post('/templates', authMiddleware, apiLimiter, async (req, res) => {
     try {

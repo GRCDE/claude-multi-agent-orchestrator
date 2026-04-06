@@ -278,6 +278,8 @@
   .proj-title { font-size: 18px; font-weight: 600; }
   .proj-summary { font-size: 13px; color: var(--txt2); margin-top: 4px; line-height: 1.5; }
   .proj-path { font-size: 11px; color: var(--txt3); font-family: var(--mono); margin-top: 4px; }
+  .btn-copy-inline { background: none; border: none; cursor: pointer; color: var(--txt3); font-size: 13px; padding: 1px 4px; border-radius: 3px; opacity: 0.5; vertical-align: middle; }
+  .btn-copy-inline:hover { opacity: 1; background: rgba(128,128,128,0.15); }
   .stats-row { display: flex; align-items: center; gap: 10px; flex-shrink: 0; text-align: right; }
   .stat-label { font-size: 12px; color: var(--txt2); margin-bottom: 5px; }
 
@@ -377,6 +379,10 @@
   .bubble-coordinator { background: var(--blue-bg); color: var(--blue-dark); }
   .bubble-message { background: var(--purple-bg); color: var(--purple); }
   .bubble-message .bubble-label { color: var(--purple); opacity: 0.8; }
+  .bubble-message-sent { background: var(--purple-bg); color: var(--purple); opacity: 0.85; }
+  .bubble-message-sent .bubble-label { color: var(--purple); opacity: 0.7; }
+  .bubble-wrap.msg-sent { justify-content: flex-end; }
+  .msg-counter-badge { background: var(--purple-bg); color: var(--purple); font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600; }
   .bubble-context { background: var(--teal-bg); color: var(--teal); }
   .bubble-context .bubble-label { color: var(--teal); opacity: 0.8; }
   .bubble-empty { font-size: 11.5px; color: var(--txt3); font-style: italic; }
@@ -679,7 +685,8 @@
   .stats-top-value { font-weight: 600; margin-left: 8px; }
 
   /* ── Erweiterte Projekt-Karten ─────────────────────────── */
-  .history-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+  .history-card.archived { opacity: 0.5; border-style: dashed; }
+.history-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm);
     padding: 12px; margin-bottom: 8px; transition: all var(--transition); }
   .history-card:hover { border-color: var(--border2); box-shadow: var(--shadow-sm); }
   .history-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
@@ -706,6 +713,10 @@
   .history-tag-add { padding: 1px 7px; font-size: 10px; border-radius: 99px; border: 0.5px dashed var(--border2);
     background: transparent; color: var(--txt3); cursor: pointer; transition: all var(--transition); }
   .history-tag-add:hover { background: var(--bg2); color: var(--txt2); }
+  .fav-star { cursor: pointer; font-size: 16px; line-height: 1; transition: color 0.15s; user-select: none; }
+  .fav-star.active { color: #f5b400; }
+  .fav-star:not(.active) { color: var(--txt3); opacity: 0.4; }
+  .fav-star:hover { opacity: 1; }
 
   /* ── Analytics modal ──────────────────────────────────── */
   .analytics-modal { max-width: 860px; }
@@ -998,6 +1009,10 @@
   .approval-task-title { font-size: 13px; font-weight: 600; }
   .approval-task textarea { min-height: 60px; font-size: 12px; margin-top: 4px; }
   .approval-task-del { font-size: 11px; color: var(--txt3); margin-top: 4px; }
+  .approval-deps-row { margin-top: 6px; }
+  .approval-deps-row label { font-size: 11px; font-weight: 500; color: var(--txt2); }
+  .approval-deps-select { width: 100%; margin-top: 2px; font-size: 11px; padding: 3px 4px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: var(--bg1); color: var(--txt); min-height: 42px; }
+  .approval-cycle-warn { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #ef4444; border-radius: var(--radius-sm); padding: 6px 10px; margin-top: 10px; font-size: 12px; font-weight: 500; }
   .approval-actions { display: flex; gap: 10px; margin-top: 1rem; }
   .task-presets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
   .task-preset-pill { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px;
@@ -1238,6 +1253,34 @@
     font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--txt); }
   .afv-files-empty { color: var(--txt3); font-size: 12px; font-style: italic; padding: 1rem 0; }
   .afv-files-loading { color: var(--txt3); font-size: 12px; padding: 1rem 0; }
+
+
+  /* Diff-Viewer */
+  .btn-diff { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--blue);
+    background: transparent; color: var(--blue); cursor: pointer; margin-left: 4px; }
+  .btn-diff:hover { background: var(--blue-bg); }
+  .diff-viewer-modal { max-width: 700px; width: 95vw; }
+  .diff-file-list { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+  .diff-file-entry { display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; border: 0.5px solid var(--border); }
+  .diff-file-entry:hover { background: var(--bg2); }
+  .diff-file-entry.active { background: var(--blue-bg); border-color: var(--blue); }
+  .diff-file-type { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+  .diff-file-type.created { background: var(--green-bg); color: var(--green); }
+  .diff-file-type.modified { background: var(--amber-bg); color: var(--amber); }
+  .diff-file-path { flex: 1; font-family: var(--mono); word-break: break-all; }
+  .diff-file-size { color: var(--txt3); font-size: 10px; white-space: nowrap; }
+  .diff-preview { margin-top: 10px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+  .diff-preview-header { display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 10px; background: var(--bg2); border-bottom: 0.5px solid var(--border); font-size: 11px; }
+  .diff-preview-body { max-height: 350px; overflow-y: auto; padding: 0; }
+  .diff-preview-body pre { margin: 0; padding: 10px 12px; white-space: pre-wrap; word-break: break-word;
+    font-family: var(--mono); font-size: 12px; line-height: 1.6; }
+  .diff-line-add { background: var(--green-bg); color: var(--green); }
+  .diff-line-del { background: var(--red-bg); color: var(--red); text-decoration: line-through; }
+  .diff-line-ctx { color: var(--txt3); }
+  .diff-summary { display: flex; gap: 12px; font-size: 12px; color: var(--txt2); margin-top: 6px; }
+  .diff-summary-item { display: flex; align-items: center; gap: 4px; }
 
   /* Statistik-Tab */
   .afv-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
@@ -1908,6 +1951,23 @@
   .view-toggle-btn:hover { background: var(--bg3); }
   .view-toggle-btn.active { background: var(--blue-bg); color: var(--blue); font-weight: 600; }
 
+  /* ── Workspace View ────────────────────────────── */
+  .ws-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+  .ws-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px; cursor: pointer; transition: border-color var(--transition); }
+  .ws-card:hover { border-color: var(--blue); }
+  .ws-card.ws-main { grid-column: 1 / -1; border-color: var(--blue); border-width: 1.5px; }
+  .ws-card-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ws-card-meta { font-size: 11px; color: var(--txt2); }
+  .ws-section-label { font-size: 11px; color: var(--txt2); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 6px; grid-column: 1 / -1; }
+  .ws-badge { display: inline-block; padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: 600; }
+  .ws-badge-run { background: var(--blue-bg); color: var(--blue); }
+  .ws-badge-queue { background: var(--orange-bg, #fff3e0); color: var(--orange, #e67700); }
+  .ws-badge-done { background: var(--green-bg); color: var(--green); }
+  .ws-badge-err { background: var(--red-bg); color: var(--red); }
+  .ws-agents-bar { display: flex; gap: 2px; margin-top: 6px; height: 6px; border-radius: 3px; overflow: hidden; }
+  .ws-agents-bar span { flex: 1; border-radius: 2px; }
+  .ws-empty { grid-column: 1 / -1; text-align: center; color: var(--txt2); padding: 24px; font-size: 13px; }
+
   /* ── DAG Graph View (Enhanced) ─────────────────────────── */
   .dag-container {
     background: var(--bg); border: 0.5px solid var(--border);
@@ -2004,20 +2064,27 @@
   .activity-filter-btn:hover { background: var(--bg3); }
   .activity-filter-btn.active { background: var(--blue-bg); color: var(--blue); border-color: var(--blue); }
   .activity-entry {
-    display: flex; align-items: center; gap: 8px; padding: 3px 6px;
+    display: flex; align-items: center; gap: 8px; padding: 4px 6px;
     border-radius: 4px; font-size: 12px; line-height: 1.4;
     transition: background var(--transition);
+    border-left: 3px solid transparent;
   }
   .activity-entry:hover { background: var(--bg2); }
-  .activity-ts { font-size: 10px; color: var(--txt3); font-family: var(--mono); flex-shrink: 0; min-width: 55px; }
+  .activity-entry.act-green { border-left-color: #22c55e; }
+  .activity-entry.act-red { border-left-color: #ef4444; }
+  .activity-entry.act-yellow { border-left-color: #eab308; }
+  .activity-entry.act-blue { border-left-color: #3b82f6; }
+  .activity-entry.act-purple { border-left-color: #a855f7; }
+  .activity-ts { font-size: 10px; color: var(--txt3); font-family: var(--mono); flex-shrink: 0; min-width: 55px; cursor: default; }
   .activity-icon { flex-shrink: 0; font-size: 13px; width: 18px; text-align: center; }
   .activity-text { flex: 1; color: var(--txt2); word-break: break-word; }
   .activity-badge {
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 9px; font-weight: 700; min-width: 18px; height: 16px;
     padding: 0 4px; border-radius: 99px; background: var(--bg3); color: var(--txt2);
-    font-family: var(--mono); flex-shrink: 0;
+    font-family: var(--mono); flex-shrink: 0; cursor: pointer;
   }
+  .activity-badge:hover { background: var(--blue-bg); color: var(--blue); }
   .activity-empty { font-size: 11.5px; color: var(--txt3); font-style: italic; padding: 8px 0; text-align: center; }
 
   /* ── Druckansicht ───────────────────────────────────────── */
@@ -2416,6 +2483,14 @@
     font-family: var(--mono); line-height: 1.4;
     max-height: 48px; overflow: hidden;
   }
+  .search-result-type-badge {
+    display: inline-block; font-size: 9px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 1px 5px; border-radius: 3px; margin-left: 6px;
+    vertical-align: middle;
+  }
+  .search-result-type-badge.type-title { background: var(--blue-bg); color: var(--blue); }
+  .search-result-type-badge.type-file { background: var(--green-bg); color: var(--green); }
+  .search-result-type-badge.type-conversation { background: var(--amber-bg); color: var(--amber); }
   .search-empty {
     padding: 20px 14px; text-align: center; color: var(--txt3); font-size: 12px;
   }
@@ -2620,7 +2695,7 @@
   <button class="top-btn" id="dndToggle" onclick="toggleDoNotDisturb()" title="Nicht st&ouml;ren" aria-label="Nicht st&ouml;ren Modus umschalten"></button>
   <button class="top-btn" id="soundToggle" onclick="toggleSound()" title="Benachrichtigungston ein/aus" aria-label="Benachrichtigungston ein/aus"></button>
   <button class="top-btn" id="notifToggle" onclick="toggleNotifications()" title="Desktop-Benachrichtigungen ein/aus" aria-label="Desktop-Benachrichtigungen ein/aus"></button>
-  <button class="top-btn" id="themeToggle" onclick="toggleDarkMode()" title="Dark/Light Mode" aria-label="Dark/Light Mode umschalten"></button>
+  <button class="top-btn" id="themeToggle" onclick="toggleDarkMode()" title="Theme umschalten" aria-label="Theme umschalten (Light/Dark/Auto)"></button>
   <button class="top-btn" id="activityToggle" onclick="toggleActivityFeed()" title="Aktivit&auml;ten (A)" aria-label="Aktivit&auml;ten ein/aus">&#9776;</button>
   <button class="top-btn" id="analyticsToggle" onclick="openAnalytics()" title="Analytics (N)" aria-label="Analytics Dashboard">&#128202;</button>
   <button class="top-btn" id="logToggle" onclick="openLogViewer()" title="Server-Logs" aria-label="Server-Logs anzeigen">&#128203;</button>
@@ -2734,16 +2809,19 @@ let compareSelected = []; // array of project IDs (max 2)
 let bulkSelectMode = false;
 let bulkSelected = new Set();
 let historyView = (function() { try { var v = localStorage.getItem('historyView'); return (v === 'list' || v === 'calendar' || v === 'stats') ? v : 'list'; } catch(e) { return 'list'; } })();
+let historyFilterTag = '';
 let historyFilterPhase = 'alle';
+let historyFilterFav = false;
 let historyFilterScore = 'alle';
 let historyFilterTime = 'alle';
 let historySort = 'datum-desc';
+let showArchived = false;
 let calendarMonth = new Date().getMonth();
 let calendarYear = new Date().getFullYear();
 let calendarPopupDay = null;
 let analyticsData = null;
 let projectTags = (function() { try { return JSON.parse(localStorage.getItem('projectTags') || '{}'); } catch(e) { return {}; } })();
-let viewMode = (function() { try { var v = localStorage.getItem('dagViewMode'); return (v === 'cards' || v === 'timeline' || v === 'graph') ? v : 'cards'; } catch(e) { return 'cards'; } })();
+let viewMode = (function() { try { var v = localStorage.getItem('dagViewMode'); return (v === 'cards' || v === 'timeline' || v === 'graph' || v === 'workspace') ? v : 'cards'; } catch(e) { return 'cards'; } })();
 let agentTimeline = {}; // Timeline tracking per agent
 let _timelineTimer = null;
 let activityFeedOpen = false;
@@ -2790,7 +2868,7 @@ function authFetch(url, options) {
   });
 }
 
-// ── Dark Mode ────────────────────────────────────────────────
+// ── Theme Mode (light / dark / auto) ─────────────────────────────
 // Migration: alte 'darkMode' Einstellung uebernehmen
 (function() {
   var old = localStorage.getItem('darkMode');
@@ -2800,27 +2878,46 @@ function authFetch(url, options) {
   }
 })();
 
-let darkMode = (function() {
+let themeMode = (function() {
   var saved = localStorage.getItem('theme');
-  if (saved === 'dark') return true;
-  if (saved === 'light') return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (saved === 'dark' || saved === 'light' || saved === 'auto') return saved;
+  return 'auto';
 })();
 
+// Kompatibilitaet: darkMode als Getter fuer bestehenden Code
+Object.defineProperty(window, 'darkMode', { get: function() {
+  if (themeMode === 'dark') return true;
+  if (themeMode === 'light') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}});
+
 function applyTheme() {
-  document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+  if (themeMode === 'auto') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', themeMode);
+  }
   var _ttEl = document.getElementById('themeToggle');
   if (_ttEl) {
-    _ttEl.setAttribute('aria-label', darkMode ? 'Zum hellen Modus wechseln' : 'Zum dunklen Modus wechseln');
-    _ttEl.textContent = darkMode ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    var labels = { light: 'Zum dunklen Modus wechseln', dark: 'Zum Auto-Modus wechseln', auto: 'Zum hellen Modus wechseln' };
+    var icons = { light: '🌙', dark: '☀️', auto: '🖥️' };
+    _ttEl.setAttribute('aria-label', labels[themeMode]);
+    _ttEl.textContent = icons[themeMode];
+    _ttEl.title = 'Theme: ' + themeMode.charAt(0).toUpperCase() + themeMode.slice(1);
   }
 }
 
 function toggleDarkMode() {
-  darkMode = !darkMode;
-  localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  var cycle = { light: 'dark', dark: 'auto', auto: 'light' };
+  themeMode = cycle[themeMode];
+  localStorage.setItem('theme', themeMode);
   applyTheme();
 }
+
+// Bei Auto-Modus: auf System-Aenderungen reagieren
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+  if (themeMode === 'auto') applyTheme();
+});
 
 applyTheme();
 
@@ -3274,12 +3371,24 @@ registerEventHandler('agent_message', function(d) {
     var from = data.from;
     var to = data.to;
     var text = data.text;
+    // Gesendete Nachricht beim Sender anzeigen
+    var outMsg = { from: 'message', text: 'An Agent ' + (to + 1) + ': ' + text, type: 'message', targetAgent: to };
+    if (state.agents[from]) {
+      state.agents[from].conversation.push(outMsg);
+      if (!state.agents[from]._msgSent) state.agents[from]._msgSent = 0;
+      state.agents[from]._msgSent++;
+    }
+    appendMessage(from, outMsg);
+    updateAgentMsgBadge(from);
     // Nachricht beim Ziel-Agenten als eingehende Nachricht anzeigen
     var inMsg = { from: 'message', text: 'Von Agent ' + (from + 1) + ': ' + text, type: 'message', sourceAgent: from };
     if (state.agents[to]) {
       state.agents[to].conversation.push(inMsg);
+      if (!state.agents[to]._msgRecv) state.agents[to]._msgRecv = 0;
+      state.agents[to]._msgRecv++;
     }
     appendMessage(to, inMsg);
+    updateAgentMsgBadge(to);
   });
 
 registerEventHandler('shared_context_update', function(d) {
@@ -3796,9 +3905,16 @@ function stopElapsedTimer() {
   if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
 }
 
+// ── Copy to Clipboard (universal) ────────────────────────────
+function copyToClipboard(text, label) {
+  if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+  navigator.clipboard.writeText(text).then(function() { showToast((label || 'Text') + ' kopiert'); });
+}
+
 // ── Copy Button ──────────────────────────────────────────────
 function copyText(btn) {
-  var bubble = btn.closest('.bubble');
+  var bubble = btn.closest('.bubble') || btn.closest('.afv-bubble');
+  if (!bubble) return;
   var textEl = bubble.querySelector('.bubble-text');
   var text = textEl ? textEl.textContent : bubble.textContent;
   navigator.clipboard.writeText(text).then(function() {
@@ -3846,6 +3962,33 @@ function updateApprovalRole(index) {
   if (agents[index]) agents[index].role = sel.value;
 }
 
+// ── Draft Auto-Save ──────────────────────────────────────────────
+var _draftKey = 'orchestrator_draft';
+function saveDraft() {
+  var d = document.getElementById('desc'), s = document.getElementById('countSlider');
+  var a = document.getElementById('approvalCheck'), p = document.getElementById('prioritySelect');
+  var draft = { desc: d ? d.value : '', agents: s ? s.value : '3', approval: a ? a.checked : false, priority: p ? p.value : '2' };
+  if (!draft.desc) { localStorage.removeItem(_draftKey); return; }
+  localStorage.setItem(_draftKey, JSON.stringify(draft));
+}
+function restoreDraft() {
+  var raw = localStorage.getItem(_draftKey); if (!raw) return;
+  try { var draft = JSON.parse(raw); } catch(e) { return; }
+  var d = document.getElementById('desc'), s = document.getElementById('countSlider');
+  var a = document.getElementById('approvalCheck'), p = document.getElementById('prioritySelect');
+  var c = document.getElementById('countDisplay');
+  if (d && draft.desc) d.value = draft.desc;
+  if (s && draft.agents) { s.value = draft.agents; s.setAttribute('aria-valuenow', draft.agents); if (c) c.textContent = draft.agents; }
+  if (a && draft.approval) a.checked = draft.approval;
+  if (p && draft.priority) p.value = draft.priority;
+  if (d) d.addEventListener('input', saveDraft);
+  if (s) s.addEventListener('input', saveDraft);
+  if (a) a.addEventListener('change', saveDraft);
+  if (p) p.addEventListener('change', saveDraft);
+  if (draft.desc) showToast('Entwurf wiederhergestellt');
+}
+function clearDraft() { localStorage.removeItem(_draftKey); }
+
 // ── Render (Full) ────────────────────────────────────────────
 function render() {
   var app = document.getElementById('app');
@@ -3855,6 +3998,7 @@ function render() {
     if (descTA) descTA.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); startProject(); }
     });
+    restoreDraft();
     loadHistory();
     updateQueueBadge();
   } else if (state.phase === 'awaiting_approval') {
@@ -3899,7 +4043,8 @@ function updateAgent(index) {
   if (foot) {
     clearEl(foot);
     var footInfoSpan = document.createElement('span');
-    var footInfoText = (agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen';
+    var msgCount = (agent._msgSent || 0) + (agent._msgRecv || 0);
+    var footInfoText = (agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (msgCount > 0 ? ' \u00B7 ' + (agent._msgSent || 0) + '/3 Nachr.' : '');
     if (agent.duration != null) footInfoText += ' \u00B7 ' + formatDuration(agent.duration);
     if (agent.status === 'done' && agent.stats) {
       footInfoText += ' \u00B7 ' + (agent.stats.filesCreated || 0) + ' Dateien \u00B7 ' + (agent.stats.linesOfCode || 0) + ' Zeilen \u00B7 ' + formatFileSize(agent.stats.totalFileSize || 0);
@@ -3937,6 +4082,12 @@ function updateAgent(index) {
       (function(idx) { retryBtn.addEventListener('click', function() { retryAgent(idx); }); })(index);
       footBtnSpan.appendChild(retryBtn);
     }
+    // Diff-Button wenn fileChanges vorhanden
+    if (agent.fileChanges && agent.fileChanges.length > 0) {
+      var diffBtn = createEl('button', { className: 'btn-diff' }, 'Diff');
+      (function(idx) { diffBtn.addEventListener('click', function(e) { e.stopPropagation(); openAgentDiffModal(idx); }); })(index);
+      footBtnSpan.appendChild(diffBtn);
+    }
     foot.appendChild(footBtnSpan);
   }
   // update card class for border color
@@ -3963,6 +4114,27 @@ function appendMessage(index, msg) {
   conv.scrollTop = conv.scrollHeight;
 }
 
+function updateAgentMsgBadge(idx) {
+  var agent = state.agents[idx];
+  if (!agent) return;
+  var card = document.querySelector('[data-agent="' + idx + '"]');
+  if (!card) return;
+  var badgeArea = card.querySelector('.agent-badge');
+  if (!badgeArea) return;
+  var existing = badgeArea.querySelector('.msg-counter-badge');
+  var sent = agent._msgSent || 0;
+  var recv = agent._msgRecv || 0;
+  if (sent + recv > 0) {
+    if (!existing) {
+      existing = document.createElement('span');
+      existing.className = 'msg-counter-badge';
+      badgeArea.insertBefore(existing, badgeArea.firstChild);
+    }
+    existing.textContent = sent + '/' + recv + ' ✉';
+    existing.title = sent + ' gesendet, ' + recv + ' empfangen (max 3 pro Agent)';
+  }
+}
+
 // Erstellt eine Bubble als sicheres DOM-Element (kein innerHTML fuer dynamische Daten)
 function buildBubbleNode(m, truncated) {
   var maxLen = truncated ? 300 : 0;
@@ -3970,12 +4142,14 @@ function buildBubbleNode(m, truncated) {
   if (truncated && m.type === 'question') maxLen = 200;
   var displayText = maxLen > 0 ? truncate(text, maxLen) : text;
 
+  var isSentMsg = m.type === 'message' && m.targetAgent != null;
   var wrap = document.createElement('div');
-  wrap.className = 'bubble-wrap' + (m.from === 'coordinator' ? ' right' : '') + (truncated ? ' fadein' : '');
+  wrap.className = 'bubble-wrap' + (m.from === 'coordinator' ? ' right' : '') + (isSentMsg ? ' msg-sent' : '') + (truncated ? ' fadein' : '');
 
   var bubble = document.createElement('div');
   var bubbleClass = 'bubble ';
   if (m.from === 'coordinator') bubbleClass += 'bubble-coordinator';
+  else if (isSentMsg) bubbleClass += 'bubble-message-sent';
   else if (m.type === 'message') bubbleClass += 'bubble-message';
   else if (m.type === 'context') bubbleClass += 'bubble-context';
   else if (m.type === 'question') bubbleClass += 'bubble-question';
@@ -4161,6 +4335,10 @@ function renderSetup() {
         '</select>' +
       '</label>' +
     '</div>' +
+    '<div class="field" style="margin-top:10px">' +
+      '<label for="tagsInput" style="font-size:13px">Tags (komma-separiert)' + ctxHelp('Optionale Tags zur Kategorisierung. Komma-separiert, z.B. "api, backend, node"') + '</label>' +
+      '<input type="text" id="tagsInput" placeholder="z.B. api, backend, node" style="width:100%;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg1);color:var(--txt);font-size:13px" aria-label="Projekt-Tags eingeben">' +
+    '</div>' +
     '<div style="margin-top:10px">' +
       '<button class="btn-milestone" onclick="openMilestoneModal()" aria-label="Meilenstein laden">' +
         '<span aria-hidden="true">&#x1F3AF;</span> Meilenstein laden' +
@@ -4205,9 +4383,18 @@ function renderApproval() {
       presetsHtml +
       '<textarea class="approval-task-edit" id="approvalTask' + i + '">' + esc(a.task || '') + '</textarea>' +
       '<div class="approval-task-del">Lieferergebnis: ' + esc(a.deliverable || '') + '</div>' +
-      (a.depends_on && a.depends_on.length > 0 ? '<div class="approval-task-del" style="color:var(--amber)">Abh\u00E4ngig von: ' + a.depends_on.map(function(d) { return 'Agent ' + (d + 1); }).join(', ') + '</div>' : '') +
+      '<div class="approval-deps-row"><label>Abhängig von:</label>' +
+        '<select class="approval-deps-select" id="approvalDeps' + i + '" multiple onchange="checkApprovalCycles()">' +
+        agents.map(function(other, j) {
+          if (j === i) return '';
+          var sel = (a.depends_on && a.depends_on.indexOf(j) !== -1) ? ' selected' : '';
+          return '<option value="' + j + '"' + sel + '>Agent ' + (j + 1) + ' – ' + esc(other.title || 'Ohne Titel') + '</option>';
+        }).join('') +
+      '</select></div>' +
     '</div>';
   });
+
+  html += '<div id="approvalCycleWarn"></div>';
 
   html += '<div class="approval-actions">' +
     '<button class="btn-primary" onclick="approvePlan()" aria-label="Plan genehmigen und Projekt starten">Genehmigen &amp; Starten</button>' +
@@ -4239,6 +4426,50 @@ async function approvePlan() {
   }
 }
 
+function checkApprovalCycles() {
+  var agents = state.agents || [];
+  var n = agents.length;
+  var deps = [];
+  for (var i = 0; i < n; i++) {
+    var sel = document.getElementById('approvalDeps' + i);
+    deps[i] = sel ? Array.from(sel.selectedOptions).map(function(o) { return parseInt(o.value, 10); }) : [];
+  }
+  var cycle = _detectCycleInDeps(deps, n);
+  var warn = document.getElementById('approvalCycleWarn');
+  if (warn) {
+    if (cycle) {
+      warn.innerHTML = '<div class="approval-cycle-warn">⚠ Zirkuläre Abhängigkeit: ' + cycle.map(function(c) { return 'Agent ' + (c + 1); }).join(' → ') + ' – Projekt kann so nicht starten!</div>';
+    } else {
+      warn.innerHTML = '';
+    }
+  }
+  return cycle;
+}
+
+function _detectCycleInDeps(deps, n) {
+  var WHITE = 0, GRAY = 1, BLACK = 2;
+  var color = [];
+  for (var i = 0; i < n; i++) color[i] = WHITE;
+  for (var s = 0; s < n; s++) {
+    if (color[s] !== WHITE) continue;
+    var stack = [{ node: s, idx: 0 }];
+    color[s] = GRAY;
+    while (stack.length > 0) {
+      var top = stack[stack.length - 1];
+      var neighbors = deps[top.node] || [];
+      if (top.idx >= neighbors.length) { color[top.node] = BLACK; stack.pop(); continue; }
+      var next = neighbors[top.idx]; top.idx++;
+      if (color[next] === GRAY) {
+        var path = [next];
+        for (var k = stack.length - 1; k >= 0; k--) { path.push(stack[k].node); if (stack[k].node === next) break; }
+        return path.reverse();
+      }
+      if (color[next] === WHITE) { color[next] = GRAY; stack.push({ node: next, idx: 0 }); }
+    }
+  }
+  return null;
+}
+
 var _modifyBusy = false;
 async function modifyAndApprove() {
   if (_modifyBusy) return;
@@ -4251,7 +4482,7 @@ async function modifyAndApprove() {
       task: textarea ? textarea.value.trim() : (a.task || ''),
       deliverable: a.deliverable || '',
       role: roleSelect ? roleSelect.value : (a.role || ''),
-      depends_on: a.depends_on || []
+      depends_on: (function() { var sel = document.getElementById('approvalDeps' + i); if (!sel) return a.depends_on || []; return Array.from(sel.selectedOptions).map(function(o) { return parseInt(o.value, 10); }); })()
     };
   });
   // Validierung
@@ -4260,6 +4491,11 @@ async function modifyAndApprove() {
       addBanner('error', 'Aufgabe f\u00FCr Agent ' + (i + 1) + ' darf nicht leer sein.');
       return;
     }
+  }
+  var cycle = checkApprovalCycles();
+  if (cycle) {
+    addBanner('error', 'Zirkuläre Abhängigkeiten erkannt! Bitte korrigiere die Abhängigkeiten.');
+    return;
   }
   _modifyBusy = true;
   try {
@@ -4423,6 +4659,57 @@ function setAgentSearch(val) {
 }
 
 // ── Timeline / Gantt View ─────────────────────────────────────
+// ── Workspace View ────────────────────────────────────────────────────
+function renderWorkspaceView() {
+  var h = '<div class="ws-grid">';
+  var agents = state.agents || [];
+  var phase = state.phase || 'idle';
+  var running = (phase === 'running' || phase === 'awaiting_approval' || phase === 'complete' || phase === 'partial' || phase === 'error');
+  if (running && state.projectId) {
+    var done = agents.filter(function(a) { return a.status === 'done'; }).length;
+    h += '<div class="ws-card ws-main" onclick="setViewMode(\'cards\')">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<div class="ws-card-title">' + esc(state.title || state.projectId) + '</div>' +
+        '<span class="ws-badge ws-badge-' + (phase === 'error' ? 'err' : phase === 'complete' ? 'done' : 'run') + '">' + esc(phase) + '</span>' +
+      '</div>' +
+      '<div class="ws-card-meta">' + done + ' / ' + agents.length + ' Agenten fertig</div>' +
+      '<div class="ws-agents-bar">' + agents.map(function(a) {
+        var c = a.status === 'done' ? 'var(--green)' : a.status === 'error' ? 'var(--red)' : a.status === 'working' ? 'var(--blue)' : 'var(--border)';
+        return '<span style="background:' + c + '"></span>';
+      }).join('') + '</div>' +
+    '</div>';
+  }
+  if (projectQueue.length > 0) {
+    h += '<div class="ws-section-label">Warteschlange (' + projectQueue.length + ')</div>';
+    projectQueue.forEach(function(item) {
+      var desc = (item.description || '').substring(0, 60);
+      h += '<div class="ws-card">' +
+        '<div class="ws-card-title">' + esc(desc || 'Projekt') + '</div>' +
+        '<div class="ws-card-meta"><span class="ws-badge ws-badge-queue">queued</span> ' + (item.agentCount || '?') + ' Agenten</div>' +
+      '</div>';
+    });
+  }
+  var recent = projectHistory.filter(function(p) {
+    return p.phase === 'complete' || p.phase === 'error' || p.phase === 'partial';
+  }).slice(0, 3);
+  if (recent.length > 0) {
+    h += '<div class="ws-section-label">Letzte Projekte</div>';
+    recent.forEach(function(p) {
+      var badge = p.phase === 'complete' ? 'done' : p.phase === 'error' ? 'err' : 'run';
+      h += '<div class="ws-card" onclick="loadProject(\'' + esc(p.id) + '\')">' +
+        '<div class="ws-card-title">' + esc(p.title || p.id) + '</div>' +
+        '<div class="ws-card-meta"><span class="ws-badge ws-badge-' + badge + '">' + esc(p.phase) + '</span> ' +
+          (p.agentCount || '?') + ' Agenten' + (p.score ? ' &middot; Score ' + p.score : '') + '</div>' +
+      '</div>';
+    });
+  }
+  if (!running && projectQueue.length === 0 && recent.length === 0) {
+    h += '<div class="ws-empty">Keine Projekte vorhanden. Starte ein neues Projekt.</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
 function setViewMode(mode) {
   viewMode = mode;
   try { localStorage.setItem('dagViewMode', mode); } catch(e) {}
@@ -5049,7 +5336,7 @@ function renderDashboard() {
       '<div style="flex:1">' +
         '<div class="complete-title">\u2713 Alle ' + esc(String(total)) + ' Agenten abgeschlossen' + (state.projectScore != null ? ' <span class="score-project">' + scoreBadge(state.projectScore) + ' Projekt-Score</span>' : '') + '</div>' +
         '<div class="complete-sub">' + esc(String(totalRounds)) + ' Runden \u00B7 ' + esc(String(totalQuestions)) + ' Frage' + (totalQuestions !== 1 ? 'n' : '') + ' \u00B7 ' + esc(String(total)) + ' Agenten' + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + projStatsText + (getTokenUsageTotals().totalTokens > 0 ? ' \u00B7 ' + esc(formatTokens(getTokenUsageTotals().totalTokens)) + ' Tokens \u00B7 ' + esc(formatCost(getTokenUsageTotals().estimatedCost)) : '') + '</div>' +
-        (state.projectDir ? '<div class="complete-path">' + esc(state.projectDir) + '</div>' : '') +
+        (state.projectDir ? '<div class="complete-path">' + esc(state.projectDir) + (state.projectId ? ' <button class="btn-copy-inline" onclick="copyToClipboard(state.projectId, 'Projekt-ID')" title="Projekt-ID kopieren">&#x2398;</button>' : '') + '</div>' : '') +
       '</div>' +
       '<button class="btn-outline" onclick="exportProject()" title="Als ZIP herunterladen">ZIP</button> ' +
       '<button class="btn-outline" onclick="exportProjectJSON()" title="Als JSON herunterladen">JSON</button> ' +
@@ -5081,7 +5368,7 @@ function renderDashboard() {
       '<div style="flex:1">' +
         '<div class="partial-title">\u26A0 ' + esc(String(successCount)) + ' von ' + esc(String(total)) + ' Agenten erfolgreich. ' + esc(String(failedCount)) + ' fehlgeschlagen.' + (state.projectScore != null ? ' <span class="score-project">' + scoreBadge(state.projectScore) + ' Projekt-Score</span>' : '') + '</div>' +
         '<div class="partial-sub">' + esc(String(totalRoundsP)) + ' Runden' + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + projStatsTextP + (getTokenUsageTotals().totalTokens > 0 ? ' \u00B7 ' + esc(formatTokens(getTokenUsageTotals().totalTokens)) + ' Tokens \u00B7 ' + esc(formatCost(getTokenUsageTotals().estimatedCost)) : '') + '</div>' +
-        (state.projectDir ? '<div class="partial-path">' + esc(state.projectDir) + '</div>' : '') +
+        (state.projectDir ? '<div class="partial-path">' + esc(state.projectDir) + (state.projectId ? ' <button class="btn-copy-inline" onclick="copyToClipboard(state.projectId, 'Projekt-ID')" title="Projekt-ID kopieren">&#x2398;</button>' : '') + '</div>' : '') +
         '<div class="partial-retry-btns">' +
           failedIdxs.map(function(idx) {
             return '<button class="btn-retry" aria-label="Agent erneut versuchen" onclick="retryAgent(' + idx + ')">Agent ' + (idx + 1) + ' wiederholen</button>';
@@ -5109,7 +5396,7 @@ function renderDashboard() {
       '<div>' +
         '<div class="proj-title" id="projTitle">' + esc(state.projectTitle || 'Projekt l\u00E4uft\u2026') + '</div>' +
         (state.projectSummary ? '<div class="proj-summary" id="projSummary">' + esc(state.projectSummary) + '</div>' : '<div class="proj-summary" id="projSummary"></div>') +
-        '<div class="proj-path" id="projPath">' + esc(state.projectDir) + '</div>' +
+        '<div class="proj-path" id="projPath">' + esc(state.projectDir) + (state.projectId ? ' <button class="btn-copy-inline" onclick="copyToClipboard(state.projectId, 'Projekt-ID')" title="Projekt-ID kopieren">&#x2398;</button>' : '') + '</div>' +
       '</div>' +
       '<div class="stats-row">' +
         (isComplete
@@ -5179,12 +5466,15 @@ function renderDashboard() {
             '<button class="view-toggle-btn' + (viewMode === 'cards' ? ' active' : '') + '" onclick="setViewMode(\'cards\')" title="Karten-Ansicht">Karten</button>' +
             '<button class="view-toggle-btn' + (viewMode === 'timeline' ? ' active' : '') + '" onclick="setViewMode(\'timeline\')" title="Timeline-Ansicht">Timeline</button>' +
             '<button class="view-toggle-btn' + (viewMode === 'graph' ? ' active' : '') + '" onclick="setViewMode(\'graph\')" title="Graph-Ansicht">Graph</button>' +
+            '<button class="view-toggle-btn' + (viewMode === 'workspace' ? ' active' : '') + '" onclick="setViewMode(\'workspace\')" title="Workspace-Ansicht">Workspace</button>' +
           '</div>' +
           (total >= 2 ? '<button class="btn-compare" onclick="openAgentCompareModal()">Agenten vergleichen</button>' : '') +
           (viewMode === 'cards' ? '<button class="btn-outline" id="toggleDetailsBtn" onclick="toggleAllDetails()" style="font-size:11px;padding:4px 10px">' + (allDetailsExpanded ? 'Details ausblenden' : 'Alle Details anzeigen') + '</button>' : '') +
         '</div>' +
       '</div>';
-    if (viewMode === 'timeline') {
+    if (viewMode === 'workspace') {
+      html += renderWorkspaceView();
+    } else if (viewMode === 'timeline') {
       html += renderTimeline(agents);
     } else if (viewMode === 'graph') {
       html += renderGraph(agents);
@@ -5408,6 +5698,135 @@ function renderFileChanges(agent) {
   });
   html += '</div>';
   return html;
+}
+
+
+// -- Diff-Viewer Modal fuer Agent-Outputs --
+function openAgentDiffModal(idx) {
+  var agent = state.agents[idx];
+  if (!agent) return;
+  var changes = agent.fileChanges || [];
+  if (changes.length === 0) return;
+  closeModal();
+
+  var id = getProjectId();
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'agentModal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Agent Diff-Ansicht');
+  overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+
+  var created = changes.filter(function(c) { return c.type === 'created'; }).length;
+  var modified = changes.length - created;
+
+  var headerHtml = '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:0.5px solid var(--border)">' +
+    '<div>' +
+      '<div style="font-size:15px;font-weight:700;color:var(--txt)">Diff: Agent ' + esc(String(idx + 1)) + '</div>' +
+      '<div style="font-size:12px;color:var(--txt3);margin-top:2px">' + esc(agent.title || '') + '</div>' +
+      '<div class="diff-summary">' +
+        '<span class="diff-summary-item"><span class="diff-file-type created">Neu</span> ' + created + '</span>' +
+        '<span class="diff-summary-item"><span class="diff-file-type modified">Geaendert</span> ' + modified + '</span>' +
+        '<span class="diff-summary-item">' + changes.length + ' Dateien gesamt</span>' +
+      '</div>' +
+    '</div>' +
+    '<button class="modal-close" aria-label="Schliessen" onclick="closeModal()">&times;</button>' +
+  '</div>';
+
+  var listHtml = '<div class="diff-file-list" id="diffFileList">';
+  changes.forEach(function(fc, i) {
+    var isNew = fc.type === 'created';
+    var typeLabel = isNew ? 'Neu' : 'Geaendert';
+    var typeCls = isNew ? 'created' : 'modified';
+    listHtml += '<div class="diff-file-entry" onclick="diffLoadFile(this,' + i + ',' + idx + ')" title="' + esc(fc.path) + '">' +
+      '<span class="diff-file-type ' + typeCls + '">' + esc(typeLabel) + '</span>' +
+      '<span class="diff-file-path">' + esc(fc.path) + '</span>' +
+      '<span class="diff-file-size">' + formatFileSize(fc.size || 0) + '</span>' +
+    '</div>';
+  });
+  listHtml += '</div>';
+
+  overlay.innerHTML = '<div class="modal diff-viewer-modal">' +
+    headerHtml +
+    '<div style="padding:10px 18px 18px;max-height:70vh;overflow-y:auto">' +
+      listHtml +
+      '<div id="diffPreviewArea"></div>' +
+    '</div>' +
+  '</div>';
+
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', modalKeyHandler);
+  overlay.focus();
+}
+
+function diffLoadFile(entryEl, changeIdx, agentIdx) {
+  var agent = state.agents[agentIdx];
+  if (!agent) return;
+  var changes = agent.fileChanges || [];
+  var fc = changes[changeIdx];
+  if (!fc) return;
+
+  // Active-State
+  var list = document.getElementById('diffFileList');
+  if (list) {
+    var items = list.querySelectorAll('.diff-file-entry');
+    for (var i = 0; i < items.length; i++) items[i].classList.remove('active');
+  }
+  if (entryEl) entryEl.classList.add('active');
+
+  var previewArea = document.getElementById('diffPreviewArea');
+  if (!previewArea) return;
+
+  var id = getProjectId();
+  if (!id) {
+    previewArea.innerHTML = '<div class="diff-preview"><div class="diff-preview-body"><pre>Keine Projekt-ID</pre></div></div>';
+    return;
+  }
+
+  var filePath = fc.path;
+  var agentPrefix = 'agent-' + agentIdx + '/';
+  if (!filePath.startsWith(agentPrefix)) {
+    filePath = agentPrefix + filePath;
+  }
+
+  previewArea.innerHTML = '<div class="diff-preview">' +
+    '<div class="diff-preview-header"><span>' + esc(fc.path) + '</span><span style="color:var(--txt3)">' + formatFileSize(fc.size || 0) + '</span></div>' +
+    '<div class="diff-preview-body"><pre>Wird geladen...</pre></div></div>';
+
+  var url = '/api/file-content/' + encodeURIComponent(id) + '/' + encodeURIComponent(filePath);
+  fetch(url).then(function(r) {
+    if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Fehler'); });
+    return r.json();
+  }).then(function(data) {
+    if (!previewArea) return;
+    var isNew = fc.type === 'created';
+    var bodyHtml;
+    if (data.binary) {
+      bodyHtml = '<div style="padding:2rem;text-align:center;color:var(--txt3)">Binaerdatei (' + formatFileSize(data.size) + ')</div>';
+    } else {
+      var lines = (data.content || '').split('\n');
+      bodyHtml = '<pre>' + lines.map(function(line) {
+        if (isNew) {
+          return '<span class="diff-line-add">+ ' + esc(line) + '</span>';
+        } else {
+          return '<span class="diff-line-ctx">  ' + esc(line) + '</span>';
+        }
+      }).join('\n') + '</pre>';
+    }
+    previewArea.innerHTML = '<div class="diff-preview">' +
+      '<div class="diff-preview-header">' +
+        '<span style="font-family:var(--mono);font-weight:600">' + esc(fc.path) + '</span>' +
+        '<div style="display:flex;gap:6px;align-items:center">' +
+          '<span class="diff-file-type ' + (isNew ? 'created' : 'modified') + '">' + (isNew ? 'Neu' : 'Geaendert') + '</span>' +
+          '<span style="font-size:10px;color:var(--txt3)">' + formatFileSize(data.size || 0) + ' | ' + lines.length + ' Zeilen</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="diff-preview-body">' + bodyHtml + '</div>' +
+    '</div>';
+  }).catch(function(err) {
+    previewArea.innerHTML = '<div class="diff-preview"><div class="diff-preview-body"><pre style="color:var(--red)">Fehler: ' + esc(err.message || '') + '</pre></div></div>';
+  });
 }
 
 function openAgentModal(idx) {
@@ -6276,12 +6695,12 @@ function renderAgent(agent, idx) {
         (function() { var rm = getRoleMeta(agent.role); return rm ? '<div class="agent-role" style="' + roleColorStyle(agent.role) + '">' + esc(rm.name) + '</div>' : (agent.role ? '<div class="agent-role" style="background:var(--bg2);color:var(--txt3)">' + esc(agent.role) + '</div>' : ''); })() +
         '<div class="agent-title"><a class="agent-title-link" onclick="openAgentModal(' + idx + ')">' + esc(agent.title || '\u2014') + '</a></div>' +
       '</div>' +
-      '<span class="agent-badge" style="display:flex;align-items:center;gap:4px">' + interventionBadgeHtml + (agent.score != null ? scoreBadge(agent.score) : '') + badge(agent.status || 'waiting') + '</span>' +
+      '<span class="agent-badge" style="display:flex;align-items:center;gap:4px">' + interventionBadgeHtml + ((agent._msgSent||0)+(agent._msgRecv||0)>0 ? '<span class="msg-counter-badge" title="Nachrichten gesendet/empfangen">' + (agent._msgSent||0) + '/' + (agent._msgRecv||0) + ' ✉</span>' : '') + (agent.score != null ? scoreBadge(agent.score) : '') + badge(agent.status || 'waiting') + '</span>' +
     '</div>' +
     ((agent.status === 'working' || agent.status === 'asking' || agent.status === 'retrying') ? '<div class="agent-progress"><div class="agent-progress-fill ' + progressColorClass(agent.progress || 0) + '" id="agentProgressFill-' + idx + '" style="width:' + (agent.progress || 0) + '%"></div></div><div class="agent-eta" id="agentEta-' + idx + '">' + (agent.etaSeconds > 0 ? '<span class="agent-eta-countdown">' + esc(formatEta(agent.etaSeconds)) + '</span>' : '') + (agent._roundsLeft > 0 ? '<span>' + agent._roundsLeft + ' Runde' + (agent._roundsLeft > 1 ? 'n' : '') + ' verbl.</span>' : '') + '</div>' : '') +
     (agent.task ? '<div class="agent-task">' + esc(truncate(agent.task, 90)) + '</div>' : '') +
     '<div class="agent-conv" role="log" aria-live="polite" aria-label="Agent-Konversation"' + (allDetailsExpanded ? ' style="max-height:none"' : '') + '>' + bubbles + '</div>' +
-    '<div class="agent-foot"><span>' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (agent.duration != null ? ' \u00B7 ' + formatDuration(agent.duration) : '')) + (agent.status === 'done' && agent.stats ? ' \u00B7 ' + (agent.stats.filesCreated || 0) + ' Dateien \u00B7 ' + (agent.stats.linesOfCode || 0) + ' Zeilen \u00B7 ' + formatFileSize(agent.stats.totalFileSize || 0) : '') + renderAgentTokenInfo(agent) + '</span><span>' + interveneBtn + quickActions + retryBtn + ' <a class="details-link" onclick="openAgentModal(' + idx + ')">Details</a></span></div>' +
+    '<div class="agent-foot"><span>' + (function(){var mc=(agent._msgSent||0)+(agent._msgRecv||0);return esc((agent.rounds||0)+' Runden \u00B7 '+(agent.questions||0)+' Fragen'+(mc>0?' \u00B7 '+(agent._msgSent||0)+'/3 Nachr.':'')+((agent.duration!=null)?' \u00B7 '+formatDuration(agent.duration):''))})() + (agent.status === 'done' && agent.stats ? ' \u00B7 ' + (agent.stats.filesCreated || 0) + ' Dateien \u00B7 ' + (agent.stats.linesOfCode || 0) + ' Zeilen \u00B7 ' + formatFileSize(agent.stats.totalFileSize || 0) : '') + renderAgentTokenInfo(agent) + '</span><span>' + interveneBtn + quickActions + retryBtn + ' + (agent.fileChanges && agent.fileChanges.length > 0 ? ' <button class=\"btn-diff\" onclick=\"event.stopPropagation();openAgentDiffModal(' + idx + ')\">Diff</button>' : '') + ' <a class="details-link" onclick="openAgentModal(' + idx + ')">Details</a></span></div>' +
     historyHtml +
     interventionFormHtml +
   '</div>';
@@ -6819,8 +7238,41 @@ async function startMilestoneProject() {
 }
 
 // ── History ──────────────────────────────────────────────────
+function toggleShowArchived() {
+  showArchived = !showArchived;
+  loadHistory();
+}
+
+function archiveProject(id) {
+  authFetch('/api/projects/' + encodeURIComponent(id) + '/archive', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  }).then(function(r) {
+    if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Fehler'); });
+    addBanner('success', 'Projekt archiviert');
+    loadHistory();
+  }).catch(function(err) {
+    addBanner('error', 'Archivieren fehlgeschlagen: ' + err.message);
+  });
+}
+
+function unarchiveProject(id) {
+  authFetch('/api/projects/' + encodeURIComponent(id) + '/unarchive', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  }).then(function(r) {
+    if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Fehler'); });
+    addBanner('success', 'Archivierung aufgehoben');
+    loadHistory();
+  }).catch(function(err) {
+    addBanner('error', 'Dearchivieren fehlgeschlagen: ' + err.message);
+  });
+}
+
 function loadHistory() {
-  fetch('/api/projects').then(function(r) {
+  fetch('/api/projects' + (showArchived ? '?includeArchived=true' : '')).then(function(r) {
     if (!r.ok) throw new Error('not found');
     return r.json();
   }).then(function(data) {
@@ -6878,6 +7330,14 @@ function getFilteredHistory() {
       return true;
     });
   }
+  if (historyFilterTag) {
+    list = list.filter(function(p) {
+      var pid = p.id || p;
+      var st = (p.tags && Array.isArray(p.tags)) ? p.tags : [];
+      var lt = projectTags[pid] || [];
+      return st.indexOf(historyFilterTag) !== -1 || lt.indexOf(historyFilterTag) !== -1;
+    });
+  }
   list.sort(function(a, b) {
     if (historySort === 'datum-desc') return (b.createdAt || 0) - (a.createdAt || 0);
     if (historySort === 'datum-asc') return (a.createdAt || 0) - (b.createdAt || 0);
@@ -6889,6 +7349,10 @@ function getFilteredHistory() {
     if (historySort === 'agents-asc') return (a.agentCount || 0) - (b.agentCount || 0);
     return 0;
   });
+  // Favoriten immer oben
+  var _favs = getFavorites();
+  list.sort(function(a, b) { var fa = _favs.indexOf(a.id||a) !== -1 ? 0 : 1; var fb = _favs.indexOf(b.id||b) !== -1 ? 0 : 1; return fa - fb; });
+  if (historyFilterFav) list = list.filter(function(p) { return _favs.indexOf(p.id||p) !== -1; });
   return list;
 }
 
@@ -6903,12 +7367,24 @@ function setHistoryFilter(type, value) {
   if (type === 'phase') historyFilterPhase = value;
   if (type === 'score') historyFilterScore = value;
   if (type === 'time') historyFilterTime = value;
+  if (type === 'tag') historyFilterTag = value;
   calendarPopupDay = null;
   renderHistory();
 }
 
 function setHistorySort(value) {
   historySort = value;
+  renderHistory();
+}
+
+// ── Favoriten ───────────────────────────────────────────────────────────
+function getFavorites() { try { return JSON.parse(localStorage.getItem('projectFavorites') || '[]'); } catch(e) { return []; } }
+function isFavorite(pid) { return getFavorites().indexOf(pid) !== -1; }
+function toggleFavorite(pid) {
+  var favs = getFavorites();
+  var idx = favs.indexOf(pid);
+  if (idx === -1) favs.push(pid); else favs.splice(idx, 1);
+  try { localStorage.setItem('projectFavorites', JSON.stringify(favs)); } catch(e) {}
   renderHistory();
 }
 
@@ -6937,6 +7413,24 @@ function removeProjectTag(pid, tag) {
   renderHistory();
 }
 
+
+// ── Notiz-System ────────────────────────────────────────────────────
+function getProjectNote(pid) { return localStorage.getItem('notes_' + pid) || ''; }
+function saveProjectNote(pid, text) {
+  text ? localStorage.setItem('notes_' + pid, text) : localStorage.removeItem('notes_' + pid);
+}
+function toggleNoteEditor(pid) {
+  var el = document.getElementById('note-editor-' + pid);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el.style.display === 'block') el.querySelector('textarea').focus();
+}
+function onNoteInput(pid, ta) {
+  saveProjectNote(pid, ta.value);
+  var icon = document.getElementById('note-icon-' + pid);
+  if (icon) icon.style.opacity = ta.value.trim() ? '1' : '0.4';
+}
+
 // ── Render: Tabs + Filter Leiste ────────────────────────────
 function renderHistoryTabs() {
   return '<div class="history-tabs">' +
@@ -6953,6 +7447,7 @@ function renderHistoryFilters() {
     var lbl = v === 'alle' ? 'Alle' : v === 'done' ? 'Fertig' : v === 'error' ? 'Fehler' : 'Sonstige';
     html += '<button class="history-filter-btn' + (historyFilterPhase === v ? ' active' : '') + '" onclick="setHistoryFilter(\'phase\',\'' + v + '\')">' + lbl + '</button>';
   });
+  html += '<button class="history-filter-btn' + (historyFilterFav ? ' active' : '') + '" onclick="historyFilterFav=!historyFilterFav;renderHistory()">★ Favoriten</button>';
   html += '</div>';
   html += '<div class="history-filter-group"><label>Score:</label>';
   ['alle','0-25','25-50','50-75','75-100'].forEach(function(v) {
@@ -6964,6 +7459,24 @@ function renderHistoryFilters() {
     html += '<button class="history-filter-btn' + (historyFilterTime === pair[0] ? ' active' : '') + '" onclick="setHistoryFilter(\'time\',\'' + pair[0] + '\')">' + pair[1] + '</button>';
   });
   html += '</div>';
+  // Tag-Filter
+  var allProjectTags = [];
+  projectHistory.forEach(function(p) {
+    var st = (p.tags && Array.isArray(p.tags)) ? p.tags : [];
+    st.forEach(function(t) { if (allProjectTags.indexOf(t) === -1) allProjectTags.push(t); });
+  });
+  Object.keys(projectTags).forEach(function(pid) {
+    (projectTags[pid] || []).forEach(function(t) { if (allProjectTags.indexOf(t) === -1) allProjectTags.push(t); });
+  });
+  if (allProjectTags.length > 0) {
+    allProjectTags.sort();
+    html += '<div class="history-filter-group"><label>Tag:</label>';
+    html += '<button class="history-filter-btn' + (historyFilterTag === '' ? ' active' : '') + '" onclick="setHistoryFilter(\'tag\',\'\')">Alle</button>';
+    allProjectTags.forEach(function(t) {
+      html += '<button class="history-filter-btn' + (historyFilterTag === t ? ' active' : '') + '" onclick="setHistoryFilter(\'tag\',\''+esc(t)+'\')">' + esc(t) + '</button>';
+    });
+    html += '</div>';
+  }
   html += '<div class="history-filter-group"><label>Sortierung:</label>' +
     '<select class="history-sort-select" aria-label="Sortierung" onchange="setHistorySort(this.value)">' +
     '<option value="datum-desc"' + (historySort === 'datum-desc' ? ' selected' : '') + '>Datum (neu)</option>' +
@@ -6976,6 +7489,8 @@ function renderHistoryFilters() {
     '<option value="agents-asc"' + (historySort === 'agents-asc' ? ' selected' : '') + '>Agents (wenige)</option>' +
     '</select></div>';
   html += '</div>';
+  html += '<div class="history-filter-group"><label><input type="checkbox"' + (showArchived ? ' checked' : '') + ' onchange="toggleShowArchived()"> Archivierte anzeigen</label></div>';
+  html += '</div>';
   return html;
 }
 
@@ -6984,11 +7499,15 @@ function renderHistoryCard(p) {
   var pid = esc(p.id || p);
   var scoreVal = p.projectScore;
   var scoreCls = scoreVal > 75 ? 'high' : scoreVal >= 50 ? 'mid' : 'low';
-  var tags = projectTags[pid] || [];
+  var serverTags = (p.tags && Array.isArray(p.tags)) ? p.tags : [];
+  var localTags = projectTags[pid] || [];
+  var tags = serverTags.slice();
+  localTags.forEach(function(t) { if (tags.indexOf(t) === -1) tags.push(t); });
   var isBulkChecked = bulkSelected.has(pid);
   var isChecked = compareSelected.indexOf(pid) !== -1;
 
-  var html = '<div class="history-card">';
+  var isArchived = p.archived || false;
+  var html = '<div class="history-card' + (isArchived ? ' archived' : '') + '">';
   if (compareMode) {
     html += '<input type="checkbox" class="compare-check" style="float:left;margin-right:8px"' + (isChecked ? ' checked' : '') + ' onclick="event.stopPropagation();toggleCompareSelect(\'' + pid + '\')"' + (!isChecked && compareSelected.length >= 2 ? ' disabled' : '') + '>';
   }
@@ -6996,6 +7515,7 @@ function renderHistoryCard(p) {
     html += '<input type="checkbox" class="bulk-check" style="float:left;margin-right:8px"' + (isBulkChecked ? ' checked' : '') + ' onclick="event.stopPropagation();toggleBulkItem(\'' + pid + '\')">';
   }
   html += '<div class="history-card-header">' +
+    '<span class="fav-star' + (isFavorite(pid) ? ' active' : '') + '" onclick="event.stopPropagation();toggleFavorite(\'' + pid + '\')" title="Favorit">★</span>' +
     '<span class="history-card-title" onclick="loadProject(\'' + pid + '\')" title="' + esc(p.title || pid) + '">' + esc(p.title || p.id || p) + '</span>' +
     '<span class="history-badges">' +
       (scoreVal != null ? scoreBadge(scoreVal) : '') +
@@ -7021,10 +7541,14 @@ function renderHistoryCard(p) {
   });
   html += '<button class="history-tag-add" onclick="event.stopPropagation();addProjectTag(\'' + pid + '\')">+ Tag</button>';
   html += '</div>';
-  html += '<div class="history-card-actions">' +
+    var noteText = getProjectNote(pid);
+  html += '<span id="note-icon-' + pid + '" class="history-card-btn" style="cursor:pointer;opacity:' + (noteText ? '1' : '0.4') + '" onclick="event.stopPropagation();toggleNoteEditor(\'' + pid + '\')" title="Notiz">📝</span>';
+  html += '<div id="note-editor-' + pid + '" style="display:none;margin-top:6px"><textarea rows="3" style="width:100%;resize:vertical;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--fg);padding:6px;font-size:12px" oninput="onNoteInput(\'' + pid + '\',this)" onclick="event.stopPropagation()" placeholder="Notiz...">' + esc(noteText) + '</textarea></div>';
+html += '<div class="history-card-actions">' +
     '<button class="history-card-btn" onclick="event.stopPropagation();resumeProject(\'' + pid + '\')" title="Fortsetzen">Fortsetzen</button>' +
     '<button class="history-card-btn" onclick="event.stopPropagation();cloneProject(\'' + pid + '\')" title="Klonen">Klonen</button>' +
     '<button class="history-card-btn" onclick="event.stopPropagation();window.open(\'/api/export/\'+encodeURIComponent(\'' + pid + '\'),\'_blank\')" title="Export">Export</button>' +
+    (isArchived ? '<button class="history-card-btn" onclick="event.stopPropagation();unarchiveProject(\'' + pid + '\')" title="Dearchivieren">Dearchivieren</button>' : '<button class="history-card-btn" onclick="event.stopPropagation();archiveProject(\'' + pid + '\')" title="Archivieren">Archivieren</button>') +
     '<button class="history-card-btn danger" onclick="event.stopPropagation();deleteProject(\'' + pid + '\')" title="L\u00F6schen">L\u00F6schen</button>' +
   '</div>';
   html += '</div>';
@@ -7600,6 +8124,7 @@ async function startProject() {
   var count = parseInt(sliderEl ? sliderEl.value : '3');
   if (!desc || busy || _startBusy) return;
   _startBusy = true;
+  clearDraft();
   busy = true;
   requestNotificationPermission();
   var startBtn = document.getElementById('startBtn');
@@ -7627,7 +8152,7 @@ async function startProject() {
     await authFetch('/api/start', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ description: desc, agentCount: count, requireApproval: requireApproval, priority: priority })
+      body: JSON.stringify({ description: desc, agentCount: count, requireApproval: requireApproval, priority: priority, tags: (function() { var ti = document.getElementById('tagsInput'); return ti && ti.value.trim() ? ti.value.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : []; })() })
     });
   } catch (e) {
     addBanner('error', 'Fehler beim Starten: ' + e.message);
@@ -8719,13 +9244,9 @@ function fileModalKeyHandler(e) {
 function copyFileContent() {
   var codeEl = document.getElementById('fileContentCode');
   if (!codeEl) return;
-  navigator.clipboard.writeText(codeEl.textContent).then(function() {
-    var btn = document.querySelector('#fileModal .file-modal-copy');
-    if (btn) {
-      btn.textContent = 'Kopiert!';
-      setTimeout(function() { btn.textContent = 'Kopieren'; }, 1500);
-    }
-  });
+  copyToClipboard(codeEl.textContent, 'Datei-Inhalt');
+  var btn = document.querySelector('#fileModal .file-modal-copy');
+  if (btn) { btn.textContent = 'Kopiert!'; setTimeout(function() { btn.textContent = 'Kopieren'; }, 1500); }
 }
 
 function startFileTreePolling() {
@@ -9420,16 +9941,36 @@ function setActivityFilter(f) {
 
 function getActivityIcon(type) {
   switch (type) {
-    case 'project_started': return '\u25B6';
-    case 'agent_started': return '\u25B6';
+    case 'project_started': return '\u25B6\uFE0F';
+    case 'agent_started': return '\uD83D\uDE80';
     case 'agent_question': return '\u2753';
-    case 'agent_answer': return '\u{1F4AC}';
-    case 'agent_done': return '\u2714';
-    case 'agent_error': return '\u2718';
-    case 'agent_message': return '\u2709';
+    case 'agent_answer': return '\uD83D\uDCAC';
+    case 'agent_done': return '\u2705';
+    case 'agent_error': return '\u274C';
+    case 'agent_message': return '\uD83D\uDCE8';
     case 'shared_file': return '\uD83D\uDCC4';
-    case 'project_complete': return '\u2714';
+    case 'project_complete': return '\uD83C\uDFC1';
+    case 'project_aborted': return '\u23F9\uFE0F';
+    case 'agent_intervention_applied': return '\u26A0\uFE0F';
+    case 'agent_intervention_queued': return '\u26A0\uFE0F';
+    case 'auto_intervention_warning': return '\u26A0\uFE0F';
+    case 'agent_skipped': return '\u23ED\uFE0F';
+    case 'agent_verified': return '\uD83D\uDD0D';
+    case 'coordinator_interim_report': return '\uD83D\uDCCB';
+    case 'plan_adapted': return '\uD83D\uDD04';
+    case 'recovery_resume': return '\uD83D\uDD27';
     default: return '\u2022';
+  }
+}
+
+function getActivityColorClass(type) {
+  switch (type) {
+    case 'agent_started': case 'project_started': case 'agent_done': case 'project_complete': return 'act-green';
+    case 'agent_error': case 'project_aborted': return 'act-red';
+    case 'agent_intervention_applied': case 'agent_intervention_queued': case 'auto_intervention_warning': case 'agent_skipped': return 'act-yellow';
+    case 'agent_question': case 'agent_answer': case 'coordinator_interim_report': return 'act-blue';
+    case 'agent_message': case 'shared_file': case 'agent_verified': case 'plan_adapted': case 'recovery_resume': return 'act-purple';
+    default: return '';
   }
 }
 
@@ -9484,11 +10025,13 @@ function filterActivity(entries) {
 }
 
 function formatActivityTime(ts) {
+  var diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+  if (diff < 5) return 'gerade';
+  if (diff < 60) return diff + 's';
+  if (diff < 3600) return Math.floor(diff / 60) + ' Min';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' Std';
   var d = new Date(ts);
-  var h = String(d.getHours()).padStart(2, '0');
-  var m = String(d.getMinutes()).padStart(2, '0');
-  var s = String(d.getSeconds()).padStart(2, '0');
-  return h + ':' + m + ':' + s;
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
 function renderActivityFeed() {
@@ -9521,13 +10064,16 @@ function renderActivityFeed() {
     for (var i = 0; i < filtered.length; i++) {
       var entry = filtered[i];
       var agentNum = getActivityAgentNum(entry);
-      var isError = entry.type === 'agent_error';
-      var entryDiv = createEl('div', { className: 'activity-entry' + (isError ? ' activity-error' : '') });
-      entryDiv.appendChild(createEl('span', { className: 'activity-ts' }, formatActivityTime(entry.ts)));
+      var colorCls = getActivityColorClass(entry.type);
+      var entryDiv = createEl('div', { className: 'activity-entry' + (colorCls ? ' ' + colorCls : '') });
+      var tsSpan = createEl('span', { className: 'activity-ts', title: new Date(entry.ts).toLocaleTimeString() }, formatActivityTime(entry.ts));
+      entryDiv.appendChild(tsSpan);
       entryDiv.appendChild(createEl('span', { className: 'activity-icon' }, getActivityIcon(entry.type)));
       entryDiv.appendChild(createEl('span', { className: 'activity-text' }, getActivityText(entry)));
       if (agentNum != null) {
-        entryDiv.appendChild(createEl('span', { className: 'activity-badge' }, 'A' + agentNum));
+        var badge = createEl('span', { className: 'activity-badge', title: 'Agent ' + agentNum + ' Details' }, 'A' + agentNum);
+        (function(num) { badge.addEventListener('click', function() { openModal(num - 1); }); })(agentNum);
+        entryDiv.appendChild(badge);
       }
       feedList.appendChild(entryDiv);
     }
@@ -9535,26 +10081,40 @@ function renderActivityFeed() {
 
   container.appendChild(feedList);
 
-  // Auto-scroll to bottom
-  var list = document.getElementById('activityFeedList');
-  if (list) list.scrollTop = list.scrollHeight;
+  // Auto-scroll nach unten
+  requestAnimationFrame(function() {
+    var list = document.getElementById('activityFeedList');
+    if (list) list.scrollTop = list.scrollHeight;
+  });
 }
 
 // -- Keyboard Shortcuts (Registry-basiert) ----------------------------------------
 var _isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 var _modLabel = _isMac ? '\u2318' : 'Ctrl';
-var _toastTimer = null;
-
-// Toast-Popup anzeigen (unten rechts, verschwindet nach 1.5s)
-function showToast(msg) {
-  var existing = document.querySelector('.shortcut-toast');
-  if (existing) existing.remove();
-  if (_toastTimer) clearTimeout(_toastTimer);
+// Toast-Popup anzeigen (unten rechts, verschwindet nach 4s, stapelbar, klickbar)
+function _getToastContainer() {
+  var c = document.querySelector('.toast-container');
+  if (!c) { c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); }
+  return c;
+}
+function showToast(msg, type) {
+  var container = _getToastContainer();
   var el = document.createElement('div');
   el.className = 'shortcut-toast';
+  if (type === 'success') el.classList.add('toast-success');
+  if (type === 'error') el.classList.add('toast-error');
   el.textContent = msg;
-  document.body.appendChild(el);
-  _toastTimer = setTimeout(function() { if (el.parentNode) el.remove(); _toastTimer = null; }, 1500);
+  el.addEventListener('click', function() {
+    el.classList.add('toast-hiding');
+    setTimeout(function() { if (el.parentNode) el.remove(); }, 300);
+  });
+  container.appendChild(el);
+  setTimeout(function() {
+    if (el.parentNode) {
+      el.classList.add('toast-hiding');
+      setTimeout(function() { if (el.parentNode) el.remove(); }, 300);
+    }
+  }, 4000);
 }
 
 // Shortcut-Registry: Zentrales Array aller Shortcuts
@@ -9618,16 +10178,16 @@ var shortcutRegistry = [
     action: function() {
       if (state.phase === 'complete' || state.phase === 'partial') { exportProject(); showToast('Export gestartet\u2026'); }
     } },
-  { key: 'd', ctrl: true, shift: false, category: 'Global', desc: 'Dark/Light Mode umschalten',
-    action: function() { toggleDarkMode(); showToast(darkMode ? 'Dark Mode aktiviert' : 'Light Mode aktiviert'); } },
+  { key: 'd', ctrl: true, shift: false, category: 'Global', desc: 'Theme umschalten (Light/Dark/Auto)',
+    action: function() { toggleDarkMode(); showToast('Theme: ' + themeMode.charAt(0).toUpperCase() + themeMode.slice(1)); } },
   { key: 'f', ctrl: true, shift: false, category: 'Global', desc: 'Suche/Filter fokussieren',
     action: function() {
       var filterInput = document.querySelector('.filter-input') || document.querySelector('.modal-search-input');
       if (filterInput) { filterInput.focus(); showToast('Suchfeld fokussiert'); }
     } },
   // -- Schnellzugriff (einfache Tasten) --
-  { key: 'd', ctrl: false, shift: false, category: 'Schnellzugriff', desc: 'Dark/Light Mode umschalten', alwaysActive: false,
-    action: function() { toggleDarkMode(); showToast(darkMode ? 'Dark Mode aktiviert' : 'Light Mode aktiviert'); } },
+  { key: 'd', ctrl: false, shift: false, category: 'Schnellzugriff', desc: 'Theme umschalten (Light/Dark/Auto)', alwaysActive: false,
+    action: function() { toggleDarkMode(); showToast('Theme: ' + themeMode.charAt(0).toUpperCase() + themeMode.slice(1)); } },
   { key: 's', ctrl: false, shift: false, category: 'Schnellzugriff', desc: 'Benachrichtigungston ein/aus', alwaysActive: false,
     action: function() { toggleSound(); showToast(soundEnabled ? 'Ton eingeschaltet' : 'Ton ausgeschaltet'); } },
   { key: 'm', ctrl: false, shift: false, category: 'Schnellzugriff', desc: 'Nicht st\u00F6ren ein/aus', alwaysActive: false,
@@ -10744,6 +11304,10 @@ function perfBarColor(pct) {
   return 'red';
 }
 
+// Memory-Verlauf (client-seitig, max 12 Eintraege = 1 Min bei 5s Intervall)
+var _perfMemHistory = [];
+var MAX_MEM_HISTORY = 12;
+
 function loadPerfMetrics() {
   var container = document.getElementById('perfContent');
   if (!container) return;
@@ -10755,6 +11319,16 @@ function loadPerfMetrics() {
     var rssMB = (data.memory.rss / 1048576).toFixed(1);
     var heapUsedMB = fmtPerfBytes(data.memory.heapUsed);
     var heapTotalMB = fmtPerfBytes(data.memory.heapTotal);
+    var totalConns = data.connections.sse + data.connections.ws;
+
+    // Memory-Verlauf tracken
+    _perfMemHistory.push({
+      time: new Date(),
+      heapMB: (data.memory.heapUsed / 1048576).toFixed(1),
+      rssMB: rssMB,
+      heapPct: heapPct
+    });
+    if (_perfMemHistory.length > MAX_MEM_HISTORY) _perfMemHistory.shift();
 
     var html = '';
 
@@ -10763,6 +11337,7 @@ function loadPerfMetrics() {
     html += '<div class="perf-card">' +
       '<div class="perf-card-label">Uptime</div>' +
       '<div class="perf-card-value">' + esc(fmtPerfUptime(data.uptime)) + '</div>' +
+      '<div class="perf-card-unit">seit ' + esc(new Date(data.serverStart).toLocaleTimeString()) + '</div>' +
     '</div>';
     html += '<div class="perf-card">' +
       '<div class="perf-card-label">CPU</div>' +
@@ -10770,18 +11345,18 @@ function loadPerfMetrics() {
       '<div class="perf-bar-wrap"><div class="perf-bar-fill ' + perfBarColor(data.cpu) + '" style="width:' + Math.min(100, data.cpu) + '%"></div></div>' +
     '</div>';
     html += '<div class="perf-card">' +
-      '<div class="perf-card-label">SSE</div>' +
-      '<div class="perf-card-value">' + data.connections.sse + '</div>' +
-      '<div class="perf-card-unit">Verbindungen</div>' +
+      '<div class="perf-card-label">Verbindungen</div>' +
+      '<div class="perf-card-value">' + totalConns + '</div>' +
+      '<div class="perf-card-unit">SSE: ' + data.connections.sse + ' / WS: ' + data.connections.ws + '</div>' +
     '</div>';
     html += '<div class="perf-card">' +
-      '<div class="perf-card-label">WebSocket</div>' +
-      '<div class="perf-card-value">' + data.connections.ws + '</div>' +
-      '<div class="perf-card-unit">Verbindungen</div>' +
+      '<div class="perf-card-label">Heap</div>' +
+      '<div class="perf-card-value">' + heapPct + '<span style="font-size:12px">%</span></div>' +
+      '<div class="perf-bar-wrap"><div class="perf-bar-fill ' + perfBarColor(heapPct) + '" style="width:' + heapPct + '%"></div></div>' +
     '</div>';
     html += '</div>';
 
-    // Memory-Sektion
+    // Memory-Sektion mit Verlauf
     html += '<div class="perf-section">';
     html += '<div class="perf-section-title">Speicher</div>';
     html += '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--txt2);margin-bottom:3px">' +
@@ -10793,9 +11368,24 @@ function loadPerfMetrics() {
       '<span>RSS: ' + esc(rssMB) + ' MB</span>' +
       '<span>External: ' + esc(fmtPerfBytes(data.memory.external)) + '</span>' +
     '</div>';
+    // Memory-Verlauf (Textanzeige)
+    if (_perfMemHistory.length > 1) {
+      html += '<div style="margin-top:8px;font-size:10px;color:var(--txt3);font-family:var(--mono);line-height:1.6">';
+      html += '<div style="font-size:10px;color:var(--txt2);margin-bottom:3px;font-family:var(--font)">Verlauf (letzte ' + _perfMemHistory.length + ' Messungen):</div>';
+      for (var mi = 0; mi < _perfMemHistory.length; mi++) {
+        var mh = _perfMemHistory[mi];
+        var timeStr = mh.time.toLocaleTimeString();
+        var pctColor = mh.heapPct > 90 ? 'var(--red)' : (mh.heapPct > 70 ? 'var(--amber)' : 'var(--txt3)');
+        html += '<span style="color:var(--txt3)">' + esc(timeStr) + '</span> ' +
+          'Heap: ' + esc(mh.heapMB) + ' MB ' +
+          '<span style="color:' + pctColor + '">(' + mh.heapPct + '%)</span> ' +
+          'RSS: ' + esc(mh.rssMB) + ' MB<br>';
+      }
+      html += '</div>';
+    }
     html += '</div>';
 
-    // Endpoint-Tabelle
+    // Endpoint-Tabelle: Top Requests
     if (data.endpoints && data.endpoints.length > 0) {
       html += '<div class="perf-section">';
       html += '<div class="perf-section-title">Top Endpoints (Requests)</div>';
@@ -10815,6 +11405,29 @@ function loadPerfMetrics() {
       }
       html += '</tbody></table>';
       html += '</div>';
+
+      // Langsamste Endpoints (nach Avg Latenz sortiert)
+      var slowest = data.endpoints.slice().sort(function(a, b) { return b.avgMs - a.avgMs; });
+      var slowTop = slowest.slice(0, 10).filter(function(e) { return e.avgMs > 0; });
+      if (slowTop.length > 0) {
+        html += '<div class="perf-section">';
+        html += '<div class="perf-section-title">Langsamste Endpoints (Avg Latenz)</div>';
+        html += '<table class="perf-table"><thead><tr>' +
+          '<th>Endpoint</th><th style="text-align:right">Avg ms</th><th style="text-align:right">Max ms</th><th style="text-align:right">Requests</th>' +
+          '</tr></thead><tbody>';
+        for (var si = 0; si < slowTop.length; si++) {
+          var sep = slowTop[si];
+          var sColor = sep.avgMs > 500 ? 'var(--red)' : (sep.avgMs > 100 ? 'var(--amber)' : 'var(--txt)');
+          html += '<tr>' +
+            '<td class="ep-name" title="' + esc(sep.endpoint) + '">' + esc(sep.endpoint) + '</td>' +
+            '<td style="text-align:right;color:' + sColor + '">' + sep.avgMs + '</td>' +
+            '<td style="text-align:right">' + sep.maxMs + '</td>' +
+            '<td style="text-align:right">' + sep.count + '</td>' +
+          '</tr>';
+        }
+        html += '</tbody></table>';
+        html += '</div>';
+      }
     } else {
       html += '<div style="text-align:center;padding:1rem;color:var(--txt3);font-size:12px">Noch keine Endpoint-Daten</div>';
     }
@@ -11402,14 +12015,24 @@ function diffModalKeyHandler(e) {
 
   function highlightMatch(text, query) {
     if (!text || !query) return esc(text || '');
-    var lower = text.toLowerCase();
     var qLower = query.toLowerCase();
-    var idx = lower.indexOf(qLower);
-    if (idx === -1) return esc(text);
-    var before = text.substring(0, idx);
-    var match = text.substring(idx, idx + query.length);
-    var after = text.substring(idx + query.length);
-    return esc(before) + '<mark>' + esc(match) + '</mark>' + esc(after);
+    var result = '', pos = 0, lower = text.toLowerCase(), idx;
+    while ((idx = lower.indexOf(qLower, pos)) !== -1) {
+      result += esc(text.substring(pos, idx));
+      result += '<mark>' + esc(text.substring(idx, idx + query.length)) + '</mark>';
+      pos = idx + query.length;
+    }
+    result += esc(text.substring(pos));
+    return result;
+  }
+
+  function extractContextSnippet(text, query) {
+    if (!text || !query) return '';
+    var idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return '';
+    var start = Math.max(0, idx - 50);
+    var end = Math.min(text.length, idx + query.length + 50);
+    return (start > 0 ? '…' : '') + text.substring(start, end) + (end < text.length ? '…' : '');
   }
 
   function renderSearchResults(results) {
@@ -11458,11 +12081,17 @@ function diffModalKeyHandler(e) {
         if (item.path) {
           html += '<div class="search-result-path">' + esc(item.path) + '</div>';
         }
-        html += '<div class="search-result-match">' + highlightMatch(matchText, q) + '</div>';
-        // Kontext anzeigen (Zeile davor/danach)
-        if (item.context) {
+        var badgeLabel = item.type === 'file' ? 'Datei' : item.type === 'conversation' ? 'Conversation' : 'Titel';
+        html += '<div class="search-result-match">' + highlightMatch(matchText, q) +
+                ' <span class="search-result-type-badge type-' + esc(item.type) + '">' + badgeLabel + '</span></div>';
+        // Kontext-Ausschnitt (50 Zeichen vor/nach Match)
+        var ctxSnippet = extractContextSnippet(item.match || matchText, q);
+        if (ctxSnippet && ctxSnippet !== matchText) {
+          html += '<div class="search-result-context">' + highlightMatch(ctxSnippet, q) + '</div>';
+        } else if (item.context) {
           var ctx = '';
-          if (item.context.before) ctx += esc(item.context.before.substring(0, 100)) + '\n';
+          if (item.context.before) ctx += esc(item.context.before.substring(0, 100)) + '
+';
           if (item.context.after) ctx += esc(item.context.after.substring(0, 100));
           if (ctx.trim()) {
             html += '<div class="search-result-context">' + ctx + '</div>';
@@ -12484,7 +13113,7 @@ var HELP_SECTIONS = [
   { id: 'quickstart', title: 'Kurzanleitung', content: '<p><strong>So startest du dein erstes Projekt:</strong></p><ol><li>Beschreibe dein Projekt im Textfeld (z.B. "Erstelle eine REST API mit Express")</li><li>W\u00E4hle die Anzahl der Agenten (2\u201310)</li><li>Klicke "Projekt starten" oder dr\u00FCcke <code>Strg+Enter</code></li><li>Der Koordinator plant die Aufgaben und die Agenten arbeiten los</li><li>Beobachte den Fortschritt im Dashboard</li><li>Nach Abschluss kannst du die Ergebnisse als ZIP herunterladen</li></ol><p>Tipp: Aktiviere "Plan vor Start pr\u00FCfen" um den Plan zu sehen, bevor die Agenten loslegen.</p>' },
   { id: 'faq', title: 'H\u00E4ufige Fragen (FAQ)', content: '<dl><dt>Was passiert, wenn ein Agent einen Fehler hat?</dt><dd>Du kannst den Agent \u00FCber den "Wiederholen"-Button neu starten. Falls das nicht hilft, kannst du ihn \u00FCberspringen oder manuell als fertig markieren.</dd><dt>Kann ich w\u00E4hrend der Ausf\u00FChrung eingreifen?</dt><dd>Ja! Klicke auf "Eingreifen" bei einem laufenden Agenten. Du kannst die Richtung \u00E4ndern, den Agenten \u00FCberspringen, neu starten oder als fertig markieren.</dd><dt>Wo landen die erstellten Dateien?</dt><dd>Alle Dateien werden im <code>projects/</code>-Ordner gespeichert. Jeder Agent hat seinen eigenen Unterordner.</dd><dt>Was sind Abh\u00E4ngigkeiten?</dt><dd>Agenten k\u00F6nnen voneinander abh\u00E4ngen. Agent B wartet z.B. bis Agent A fertig ist, bevor er startet.</dd><dt>Was ist der Qualit\u00E4ts-Score?</dt><dd>Der Koordinator bewertet die Ergebnisse jedes Agenten auf einer Skala von 0\u2013100. Gr\u00FCn (&gt;80) ist gut, Gelb (50\u201380) akzeptabel, Rot (&lt;50) verbesserungsw\u00FCrdig.</dd><dt>Wie funktioniert das Budget?</dt><dd>Das Budget begrenzt die Token-Nutzung pro Projekt. Du kannst es in den Einstellungen konfigurieren. Bei \u00DCberschreitung wird gewarnt.</dd><dt>Was ist eine Merge-Strategie?</dt><dd>Wenn mehrere Agenten die gleiche Datei bearbeiten, bestimmt die Merge-Strategie wie Konflikte gel\u00F6st werden (z.B. letzter Agent gewinnt, manuell, oder intelligent zusammenf\u00FChren).</dd></dl>' },
   { id: 'glossary', title: 'Glossar', content: '<dl><dt>Agent</dt><dd>Eine unabh\u00E4ngige Claude Code Instanz, die eine spezifische Teilaufgabe bearbeitet. Jeder Agent arbeitet in seinem eigenen Verzeichnis.</dd><dt>Koordinator</dt><dd>Die zentrale Instanz, die das Projekt plant, Aufgaben verteilt, R\u00FCckfragen beantwortet und den Gesamtfortschritt \u00FCberwacht.</dd><dt>Meilenstein</dt><dd>Ein vordefinierter Satz von Aufgaben, der als Vorlage geladen werden kann. N\u00FCtzlich f\u00FCr wiederkehrende Projekttypen.</dd><dt>Intervention</dt><dd>Ein manueller Eingriff in die Arbeit eines Agenten. Typen: Richtungs\u00E4nderung, \u00DCberspringen, Neustart, Fertig markieren, Zusatzinformation.</dd><dt>Vorlage (Template)</dt><dd>Eine gespeicherte Projektbeschreibung, die schnell wiederverwendet werden kann.</dd><dt>Zwischenbericht</dt><dd>Ein Bericht des Koordinators w\u00E4hrend der Ausf\u00FChrung \u00FCber den bisherigen Fortschritt.</dd><dt>R\u00FCckfrage</dt><dd>Wenn ein Agent unsicher ist, stellt er eine Frage an den Koordinator. Dieser antwortet automatisch basierend auf dem Projektkontext.</dd><dt>Warteschlange (Queue)</dt><dd>Mehrere Projekte k\u00F6nnen in die Warteschlange gestellt werden und werden nacheinander abgearbeitet.</dd><dt>Token</dt><dd>Die Grundeinheit der KI-Textverarbeitung. Mehr Tokens = l\u00E4ngere Texte und h\u00F6here Kosten.</dd></dl>' },
-  { id: 'shortcuts', title: 'Tastenk\u00FCrzel', content: '<ul><li><code>?</code> \u2013 Tastenk\u00FCrzel-\u00DCbersicht</li><li><code>F1</code> \u2013 Hilfe-Panel \u00F6ffnen/schlie\u00DFen</li><li><code>Strg+Enter</code> \u2013 Projekt starten</li><li><code>Strg+D</code> \u2013 Dark/Light Mode</li><li><code>Strg+E</code> \u2013 ZIP exportieren</li><li><code>Strg+K</code> \u2013 Suche \u00F6ffnen</li><li><code>Strg+Shift+A</code> \u2013 Projekt abbrechen</li><li><code>Strg+Shift+R</code> \u2013 Projekt zur\u00FCcksetzen</li><li><code>D</code> \u2013 Dark Mode umschalten</li><li><code>S</code> \u2013 Ton ein/aus</li><li><code>M</code> \u2013 Nicht st\u00F6ren</li><li><code>A</code> \u2013 Aktivit\u00E4ten-Feed</li><li><code>Esc</code> \u2013 Modal/Panel schlie\u00DFen</li></ul>' },
+  { id: 'shortcuts', title: 'Tastenk\u00FCrzel', content: '<ul><li><code>?</code> \u2013 Tastenk\u00FCrzel-\u00DCbersicht</li><li><code>F1</code> \u2013 Hilfe-Panel \u00F6ffnen/schlie\u00DFen</li><li><code>Strg+Enter</code> \u2013 Projekt starten</li><li><code>Strg+D</code> \u2013 Theme (Light/Dark/Auto)</li><li><code>Strg+E</code> \u2013 ZIP exportieren</li><li><code>Strg+K</code> \u2013 Suche \u00F6ffnen</li><li><code>Strg+Shift+A</code> \u2013 Projekt abbrechen</li><li><code>Strg+Shift+R</code> \u2013 Projekt zur\u00FCcksetzen</li><li><code>D</code> \u2013 Theme umschalten</li><li><code>S</code> \u2013 Ton ein/aus</li><li><code>M</code> \u2013 Nicht st\u00F6ren</li><li><code>A</code> \u2013 Aktivit\u00E4ten-Feed</li><li><code>Esc</code> \u2013 Modal/Panel schlie\u00DFen</li></ul>' },
   { id: 'interventions', title: 'Interventions-Typen', content: '<dl><dt>Richtung \u00E4ndern (redirect)</dt><dd>Gibt dem Agenten neue Anweisungen oder korrigiert seine Arbeitsrichtung, ohne ihn neu zu starten.</dd><dt>\u00DCberspringen (skip)</dt><dd>Beendet den Agenten sofort und markiert ihn als \u00FCbersprungen. N\u00FCtzlich wenn eine Aufgabe nicht mehr relevant ist.</dd><dt>Neustart (restart)</dt><dd>Startet den Agenten komplett von vorne. Bisherige Arbeit wird verworfen.</dd><dt>Fertig markieren (complete)</dt><dd>Markiert den Agenten als erfolgreich abgeschlossen, unabh\u00E4ngig vom aktuellen Zustand.</dd><dt>Information hinzuf\u00FCgen (inject)</dt><dd>Sendet zus\u00E4tzliche Informationen an den Agenten, die er bei seiner n\u00E4chsten Runde ber\u00FCcksichtigt.</dd></dl>' }
 ];
 

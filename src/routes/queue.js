@@ -244,7 +244,7 @@ function init(deps) {
           broadcastQueueUpdate();
           if (next) {
             logger.info('N\u00e4chstes Projekt aus Queue gestartet', { description: next.description.slice(0, 50) });
-            startProject(next.description, next.agentCount, next.requireApproval);
+            startProject(next.description, next.agentCount, next.requireApproval, { tags: next.tags || [] });
           }
         }, _queueDequeueDelay);
       }

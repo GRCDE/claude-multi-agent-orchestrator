@@ -83,20 +83,29 @@ jest.mock('../../orchestrator', () => {
   return MockOrchestrator;
 });
 
-describe('Security Tests', () => {
-  beforeAll(done => {
-    process.env.PORT = TEST_PORT;
-    Object.keys(require.cache).forEach(key => {
-      if (key.includes('server.js')) delete require.cache[key];
-    });
+jest.setTimeout(60000);
 
-    try {
-      require('../../server');
-      setTimeout(done, 500);
-    } catch (e) {
-      done(e);
+describe('Security Tests', () => {
+  beforeAll(async () => {
+    process.env.PORT = TEST_PORT;
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      Object.keys(require.cache).forEach(key => {
+        if (key.includes('server.js')) delete require.cache[key];
+      });
+      try {
+        require('../../server');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return;
+      } catch (e) {
+        if (e.code === 'EADDRINUSE' && attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+        throw e;
+      }
     }
-  });
+  }, 15000);
 
   afterAll(async () => {
     const serverMod = require('../../server');
