@@ -192,22 +192,34 @@
   .banner .dismiss { background: none; border: none; cursor: pointer; font-size: 16px; color: inherit; opacity: 0.7; padding: 0 4px; }
   .banner .dismiss:hover { opacity: 1; }
 
-  /* ── Dark mode toggle ──────────────────────────────────── */
-  .theme-toggle { position: fixed; top: 12px; right: 16px; z-index: 90;
-    background: var(--bg2); border: 0.5px solid var(--border); border-radius: 99px;
+  /* ── Top-right controls ───────────────────────────────── */
+  .top-controls { position: fixed; top: 12px; right: 16px; z-index: 90;
+    display: flex; align-items: center; gap: 6px; }
+  .top-btn { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 99px;
     padding: 6px 10px; cursor: pointer; font-size: 16px; line-height: 1;
     transition: background var(--transition), border-color var(--transition); box-shadow: var(--shadow-sm); }
-  .theme-toggle:hover { background: var(--bg3); }
+  .top-btn:hover { background: var(--bg3); }
+  .notif-status { font-size: 10px; color: var(--txt3); position: absolute; bottom: -14px; right: 0; white-space: nowrap; }
 
   /* ── History list ──────────────────────────────────────── */
   .history-list { margin-top: 1.5rem; border-top: 0.5px solid var(--border); padding-top: 1rem; }
   .history-item { display: flex; justify-content: space-between; align-items: center;
     padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer;
-    transition: background var(--transition); font-size: 13px; }
+    transition: background var(--transition); font-size: 13px; gap: 8px; }
   .history-item:hover { background: var(--bg2); }
   .history-id { font-family: var(--mono); font-size: 11px; color: var(--txt3); }
-  .history-title { color: var(--txt); font-weight: 500; }
+  .history-title { color: var(--txt); font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .history-empty { color: var(--txt3); font-size: 12px; font-style: italic; }
+  .history-delete { background: none; border: none; color: var(--txt3); cursor: pointer;
+    font-size: 14px; padding: 2px 6px; border-radius: 4px; transition: all var(--transition);
+    flex-shrink: 0; line-height: 1; }
+  .history-delete:hover { background: var(--red-bg); color: var(--red); }
+  .history-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+  .history-actions .btn-sm { font-size: 12px; padding: 5px 12px; border-radius: 6px;
+    border: 0.5px solid var(--border); background: var(--bg2); color: var(--txt2);
+    cursor: pointer; transition: all var(--transition); }
+  .history-actions .btn-sm:hover { background: var(--bg3); color: var(--txt); }
+  .disk-usage { font-size: 11px; color: var(--txt3); margin-top: 8px; }
 
   /* ── Modal overlay ────────────────────────────────────── */
   .modal-overlay {
@@ -304,6 +316,24 @@
   .approval-task-del { font-size: 11px; color: var(--txt3); margin-top: 4px; }
   .approval-actions { display: flex; gap: 10px; margin-top: 1rem; }
 
+  /* ── Settings modal ──────────────────────────────────────── */
+  .settings-modal { max-width: 480px; }
+  .settings-modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 1rem; }
+  .settings-field { margin-bottom: 12px; }
+  .settings-field label { font-size: 12px; color: var(--txt2); margin-bottom: 4px; display: block; }
+  .settings-field input[type=number], .settings-field input[type=text] {
+    width: 100%; padding: 7px 10px; background: var(--bg2); border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--txt); font-family: var(--mono); font-size: 13px;
+    transition: border-color var(--transition);
+  }
+  .settings-field input:focus { outline: none; border-color: var(--border2); box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+  .settings-field .hint { font-size: 10px; color: var(--txt3); margin-top: 2px; }
+  .settings-field input[readonly] { opacity: 0.5; cursor: not-allowed; }
+  .settings-actions { display: flex; gap: 8px; margin-top: 1rem; }
+  .settings-status { font-size: 12px; margin-top: 8px; min-height: 18px; }
+  .settings-status.ok { color: var(--green); }
+  .settings-status.err { color: var(--red); }
+
   /* ── Mobile responsive ─────────────────────────────────── */
   @media (max-width: 768px) {
     #app { padding: 1rem; }
@@ -313,13 +343,18 @@
     .row { flex-direction: column; }
     .count-box { flex: none; width: 100%; }
     .stats-row { width: 100%; text-align: left; }
-    .theme-toggle { top: 8px; right: 8px; padding: 4px 8px; font-size: 14px; }
+    .top-controls { top: 8px; right: 8px; }
+    .top-btn { padding: 4px 8px; font-size: 14px; }
   }
 </style>
 </head>
 <body>
 <div class="conn-bar" id="connBar"></div>
-<button class="theme-toggle" id="themeToggle" onclick="toggleDarkMode()" title="Dark/Light Mode"></button>
+<div class="top-controls">
+  <button class="top-btn" id="settingsToggle" onclick="openSettings()" title="Einstellungen">&#9881;</button>
+  <button class="top-btn" id="soundToggle" onclick="toggleSound()" title="Benachrichtigungston ein/aus"></button>
+  <button class="top-btn" id="themeToggle" onclick="toggleDarkMode()" title="Dark/Light Mode"></button>
+</div>
 <div id="app"></div>
 
 <script>
@@ -342,6 +377,7 @@ let busy = false;
 let lastPhase = 'setup';
 let banners = []; // { id, type: 'warn'|'error', text }
 let bannerIdCounter = 0;
+let mergedFiles = null; // { files: [...], dir: '...' }
 let projectHistory = [];
 let templates = [];
 let selectedTemplateId = null;
@@ -363,6 +399,93 @@ function toggleDarkMode() {
 }
 
 applyTheme();
+
+// ── Sound Notifications (Web Audio API) ──────────────────────
+let soundEnabled = localStorage.getItem('soundEnabled') === 'true';
+
+function applySoundToggle() {
+  document.getElementById('soundToggle').textContent = soundEnabled ? '\uD83D\uDD14' : '\uD83D\uDD15';
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem('soundEnabled', String(soundEnabled));
+  applySoundToggle();
+  // Request notification permission when enabling sound
+  if (soundEnabled) requestNotificationPermission();
+}
+
+function playBeep(freq, duration) {
+  if (!soundEnabled) return;
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = freq || 520;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (duration || 0.3));
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + (duration || 0.3));
+    setTimeout(function() { ctx.close(); }, 500);
+  } catch (e) { /* Web Audio not available */ }
+}
+
+function playSuccessBeep() {
+  if (!soundEnabled) return;
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    osc.frequency.setValueAtTime(523, ctx.currentTime);
+    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.12);
+    osc.frequency.setValueAtTime(784, ctx.currentTime + 0.24);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.5);
+    setTimeout(function() { ctx.close(); }, 700);
+  } catch (e) { /* Web Audio not available */ }
+}
+
+function playErrorBeep() {
+  playBeep(330, 0.4);
+}
+
+applySoundToggle();
+
+// ── Browser Notifications (Notification API) ─────────────────
+function requestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function showNotification(title, body) {
+  // Only show when page is hidden
+  if (!document.hidden) return;
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  try {
+    var n = new Notification(title, {
+      body: body,
+      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🤖</text></svg>',
+      tag: 'orchestrator-' + Date.now()
+    });
+    n.onclick = function() {
+      window.focus();
+      n.close();
+    };
+    // Auto-close after 8 seconds
+    setTimeout(function() { n.close(); }, 8000);
+  } catch (e) { /* Notification failed */ }
+}
 
 // ── SSE Connection mit Reconnect + Backoff ───────────────────
 let es;
@@ -416,6 +539,17 @@ function connect() {
     if (d.phase === 'running') { startElapsedTimer(); if (fileTreeOpen) startFileTreePolling(); }
     if (d.phase === 'awaiting_approval') { stopElapsedTimer(); }
     if (d.phase === 'complete' || d.phase === 'error') { stopElapsedTimer(); if (fileTreeOpen) loadFileTree(); }
+    // Notifications
+    if (d.phase === 'complete') {
+      var agentCount = (state.agents || []).length;
+      var projName = state.projectTitle || 'Projekt';
+      showNotification(projName, 'Projekt abgeschlossen! Alle ' + agentCount + ' Agenten fertig.');
+      playSuccessBeep();
+    }
+    if (d.phase === 'error') {
+      showNotification(state.projectTitle || 'Projekt', 'Ein Fehler ist aufgetreten.');
+      playErrorBeep();
+    }
     render();
   });
 
@@ -436,11 +570,24 @@ function connect() {
     var data = JSON.parse(e.data);
     var idx = data.index;
     var agent = data.agent;
+    var prevStatus = state.agents[idx] ? state.agents[idx].status : null;
     if (state.agents[idx]) {
       state.agents[idx] = Object.assign({}, state.agents[idx], agent);
       // preserve conversation if not in update
       if (!agent.conversation && state.agents[idx].conversation) {
         // keep existing
+      }
+    }
+    // Notifications for status changes
+    if (agent.status && agent.status !== prevStatus) {
+      var agentLabel = 'Agent ' + (idx + 1);
+      var projName = state.projectTitle || 'Projekt';
+      if (agent.status === 'error') {
+        showNotification(projName, agentLabel + ' ist fehlgeschlagen.');
+        playErrorBeep();
+      }
+      if (agent.status === 'asking') {
+        showNotification(projName, agentLabel + ' hat eine Frage an den Koordinator.');
       }
     }
     updateAgent(idx);
@@ -505,6 +652,12 @@ function connect() {
       } catch(ex) { /* ignore parse errors */ }
     }
   });
+
+  es.addEventListener('merge_complete', function(e) {
+    var d = JSON.parse(e.data);
+    mergedFiles = d;
+    render();
+  });
 }
 
 function applyState(s) {
@@ -559,6 +712,7 @@ var BADGE_MAP = {
   working:  ['Arbeitet', '#E6F1FB','#185FA5', true],
   asking:   ['Fragt\u2026',   '#FAEEDA','#854F0B', true],
   done:     ['Fertig',   '#E1F5EE','#0F6E56', false],
+  waiting_deps: ['Wartet…', '#FAEEDA','#854F0B', true],
   error:    ['Fehler',   '#FCEBEB','#A32D2D', false],
   complete: ['Fertig',   '#E1F5EE','#0F6E56', false]
 };
@@ -764,6 +918,7 @@ function renderApproval() {
       '<div class="approval-task-title">' + esc(a.title || '') + '</div>' +
       '<textarea class="approval-task-edit" id="approvalTask' + i + '">' + esc(a.task || '') + '</textarea>' +
       '<div class="approval-task-del">Lieferergebnis: ' + esc(a.deliverable || '') + '</div>' +
+      (a.depends_on && a.depends_on.length > 0 ? '<div class="approval-task-del" style="color:var(--amber)">Abhängig von: ' + a.depends_on.map(function(d) { return 'Agent ' + (d + 1); }).join(', ') + '</div>' : '') +
     '</div>';
   });
 
@@ -796,7 +951,8 @@ async function modifyAndApprove() {
       title: a.title || '',
       task: textarea ? textarea.value.trim() : (a.task || ''),
       deliverable: a.deliverable || '',
-      role: a.role || ''
+      role: a.role || '',
+      depends_on: a.depends_on || []
     };
   });
   // Validierung
@@ -848,8 +1004,24 @@ function renderDashboard() {
         (state.projectDir ? '<div class="complete-path">' + esc(state.projectDir) + '</div>' : '') +
       '</div>' +
       '<button class="btn-outline" onclick="exportProject()">ZIP Export</button> ' +
+      '<button class="btn-outline" onclick="loadMergedFiles()">Zusammengef\u00FChrte Dateien</button> ' +
       '<button class="btn-outline" onclick="resetProject()">Neues Projekt</button>' +
     '</div>';
+
+    // Zusammengeführte Dateien anzeigen
+    if (mergedFiles && mergedFiles.files && mergedFiles.files.length > 0) {
+      html += '<div class="card fadein" style="border-color:var(--green);margin-top:0.5rem">' +
+        '<div class="section-label">Zusammengef\u00FChrte Dateien</div>' +
+        '<div style="font-size:12px;color:var(--txt2);margin-bottom:8px">' + esc(mergedFiles.dir || '') + '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px">';
+      for (var mi = 0; mi < mergedFiles.files.length; mi++) {
+        var mf = mergedFiles.files[mi];
+        var fname = typeof mf === 'string' ? mf : mf.name;
+        var fsize = typeof mf === 'object' && mf.size ? ' (' + (mf.size < 1024 ? mf.size + ' B' : Math.round(mf.size / 1024) + ' KB') + ')' : '';
+        html += '<div style="font-family:var(--mono);font-size:12px;padding:4px 8px;background:var(--bg2);border-radius:var(--radius-sm)">' + esc(fname) + '<span style="color:var(--txt3)">' + esc(fsize) + '</span></div>';
+      }
+      html += '</div></div>';
+    }
   }
 
   // Project header
@@ -969,7 +1141,11 @@ function openAgentModal(idx) {
   var conv = agent.conversation || [];
   var bubblesHtml = '';
   if (conv.length === 0) {
-    bubblesHtml = '<div class="bubble-empty">' + (agent.status === 'waiting' ? 'Wartet auf Zuweisung\u2026' : 'Noch keine Nachrichten.') + '</div>';
+    var modalDepsInfo = '';
+    if ((agent.status === 'waiting' || agent.status === 'waiting_deps') && agent.depends_on && agent.depends_on.length > 0) {
+      modalDepsInfo = 'Wartet auf ' + agent.depends_on.map(function(d) { return 'Agent ' + (d + 1); }).join(', ');
+    }
+    bubblesHtml = '<div class="bubble-empty">' + (modalDepsInfo || (agent.status === 'waiting' ? 'Wartet auf Zuweisung…' : 'Noch keine Nachrichten.')) + '</div>';
   } else {
     bubblesHtml = conv.map(function(m) { return renderBubbleFull(m); }).join('');
   }
@@ -1021,7 +1197,11 @@ function renderAgent(agent, idx) {
   var conv = agent.conversation || [];
   var bubbles = '';
   if (conv.length === 0) {
-    bubbles = '<div class="bubble-empty">' + (agent.status === 'waiting' ? 'Wartet auf Zuweisung\u2026' : 'Startet\u2026') + '</div>';
+    var depsInfo = '';
+    if ((agent.status === 'waiting' || agent.status === 'waiting_deps') && agent.depends_on && agent.depends_on.length > 0) {
+      depsInfo = 'Wartet auf ' + agent.depends_on.map(function(d) { return 'Agent ' + (d + 1); }).join(', ');
+    }
+    bubbles = '<div class="bubble-empty">' + (depsInfo || (agent.status === 'waiting' || agent.status === 'waiting_deps' ? 'Wartet auf Zuweisung…' : 'Startet…')) + '</div>';
   } else {
     bubbles = conv.map(function(m) { return renderBubble(m); }).join('');
   }
@@ -1114,17 +1294,70 @@ function renderHistory() {
   var area = document.getElementById('historyArea');
   if (!area) return;
   if (projectHistory.length === 0) {
-    area.innerHTML = '<div class="section-label">Bisherige Projekte</div><div class="history-empty">Noch keine Projekte vorhanden.</div>';
+    area.innerHTML = '<div class="section-label">Bisherige Projekte</div><div class="history-empty">Noch keine Projekte vorhanden.</div><div class="disk-usage" id="diskUsageInfo"></div>';
+    loadDiskUsage();
     return;
   }
   var html = '<div class="section-label">Bisherige Projekte</div>';
   projectHistory.forEach(function(p) {
-    html += '<div class="history-item" onclick="loadProject(\'' + esc(p.id || p) + '\')">' +
-      '<span class="history-title">' + esc(p.title || p.id || p) + (p.totalDuration ? ' (' + formatDuration(p.totalDuration) + ')' : '') + '</span>' +
-      '<span class="history-id">' + esc(p.id || p) + '</span>' +
+    var pid = esc(p.id || p);
+    html += '<div class="history-item">' +
+      '<span class="history-title" onclick="loadProject(\'' + pid + '\')">' + esc(p.title || p.id || p) + (p.totalDuration ? ' (' + formatDuration(p.totalDuration) + ')' : '') + '</span>' +
+      '<span class="history-id">' + pid + '</span>' +
+      '<button class="history-delete" onclick="event.stopPropagation();deleteProject(\'' + pid + '\')" title="Projekt löschen">✕</button>' +
     '</div>';
   });
+  html += '<div class="history-actions"><button class="btn-sm" onclick="cleanupProjects()">Alte Projekte aufräumen</button></div>';
+  html += '<div class="disk-usage" id="diskUsageInfo"></div>';
   area.innerHTML = html;
+  loadDiskUsage();
+}
+
+function deleteProject(id) {
+  if (!confirm('Projekt "' + id + '" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) return;
+  fetch('/api/projects/' + encodeURIComponent(id), { method: 'DELETE' })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Fehler'); });
+      return r.json();
+    })
+    .then(function() {
+      addBanner('success', 'Projekt ' + id + ' gelöscht.');
+      loadHistory();
+    })
+    .catch(function(err) {
+      addBanner('error', 'Löschen fehlgeschlagen: ' + err.message);
+    });
+}
+
+function cleanupProjects() {
+  if (!confirm('Alle Projekte löschen, die älter als 7 Tage sind?')) return;
+  fetch('/api/cleanup', { method: 'POST' })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Fehler'); });
+      return r.json();
+    })
+    .then(function(data) {
+      if (data.count > 0) {
+        addBanner('success', data.count + ' alte Projekt(e) gelöscht.');
+      } else {
+        addBanner('info', 'Keine Projekte älter als 7 Tage gefunden.');
+      }
+      loadHistory();
+    })
+    .catch(function(err) {
+      addBanner('error', 'Aufräumen fehlgeschlagen: ' + err.message);
+    });
+}
+
+function loadDiskUsage() {
+  fetch('/api/disk-usage').then(function(r) {
+    if (!r.ok) throw new Error('Fehler');
+    return r.json();
+  }).then(function(data) {
+    var el = document.getElementById('diskUsageInfo');
+    if (!el) return;
+    el.textContent = 'Speicher: ' + data.projectCount + ' Projekt(e) • ' + data.totalSize + ' belegt';
+  }).catch(function() {});
 }
 
 function loadProject(id) {
@@ -1147,6 +1380,7 @@ async function startProject() {
   var count = parseInt(sliderEl ? sliderEl.value : '3');
   if (!desc || busy) return;
   busy = true;
+  requestNotificationPermission();
   var btn = document.getElementById('startBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Startet\u2026'; }
 
@@ -1190,6 +1424,7 @@ async function resetProject() {
     agents: [], startedAt: null, completedAt: null, totalDuration: null
   };
   banners = [];
+  mergedFiles = null;
   fileTreeOpen = false;
   fileGroupState = {};
   stopFileTreePolling();
@@ -1204,6 +1439,27 @@ function exportProject() {
     return;
   }
   window.location = '/api/export/' + encodeURIComponent(id);
+}
+
+async function loadMergedFiles() {
+  var dir = state.projectDir || '';
+  var id = dir.split('/').pop() || dir.split('\\').pop() || '';
+  if (!id) {
+    addBanner('error', 'Keine Projekt-ID gefunden.');
+    return;
+  }
+  try {
+    var r = await fetch('/api/merged/' + encodeURIComponent(id));
+    if (!r.ok) {
+      addBanner('warn', 'Zusammengef\u00FChrte Dateien nicht verf\u00FCgbar.');
+      return;
+    }
+    var data = await r.json();
+    mergedFiles = data;
+    render();
+  } catch (e) {
+    addBanner('error', 'Fehler beim Laden der zusammengef\u00FChrten Dateien.');
+  }
 }
 
 async function retryAgent(index) {
@@ -1361,6 +1617,102 @@ function startFileTreePolling() {
 
 function stopFileTreePolling() {
   if (fileTreeTimer) { clearInterval(fileTreeTimer); fileTreeTimer = null; }
+// ── Settings Panel ────────────────────────────────────────────
+var SETTINGS_FIELDS = [
+  { key: 'agentTimeout',   label: 'Agent-Timeout (ms)',           hint: 'Min: 30.000 / Max: 1.800.000', min: 30000, max: 1800000 },
+  { key: 'maxRetries',     label: 'Max. Wiederholungen',          hint: 'Min: 0 / Max: 20',             min: 0,     max: 20 },
+  { key: 'retryBaseDelay', label: 'Retry-Basisverz\u00F6gerung (ms)', hint: 'Min: 1.000 / Max: 60.000', min: 1000,  max: 60000 },
+  { key: 'maxAgents',      label: 'Max. Agenten',                 hint: 'Min: 1 / Max: 50',             min: 1,     max: 50 },
+  { key: 'concurrency',    label: 'Parallelit\u00E4t',            hint: 'Min: 1 / Max: 20',             min: 1,     max: 20 },
+  { key: 'maxRounds',      label: 'Max. Runden pro Agent',        hint: 'Min: 1 / Max: 20',             min: 1,     max: 20 },
+];
+
+function openSettings() {
+  closeSettings();
+  fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+    var overlay = document.createElement('div');
+    overlay.id = 'settingsModal';
+    overlay.className = 'modal-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) closeSettings(); };
+
+    var fieldsHtml = '';
+    for (var i = 0; i < SETTINGS_FIELDS.length; i++) {
+      var f = SETTINGS_FIELDS[i];
+      var val = cfg[f.key] !== undefined ? cfg[f.key] : '';
+      fieldsHtml += '<div class="settings-field">' +
+        '<label for="cfg_' + f.key + '">' + esc(f.label) + '</label>' +
+        '<input type="number" id="cfg_' + f.key + '" value="' + esc(String(val)) + '" min="' + f.min + '" max="' + f.max + '" step="1">' +
+        '<div class="hint">' + esc(f.hint) + '</div>' +
+        '</div>';
+    }
+    fieldsHtml += '<div class="settings-field">' +
+      '<label for="cfg_webhookUrl">Webhook URL</label>' +
+      '<input type="text" id="cfg_webhookUrl" value="' + esc(cfg.webhookUrl || '(nicht gesetzt)') + '" readonly>' +
+      '<div class="hint">Nur per Umgebungsvariable WEBHOOK_URL \u00E4nderbar</div>' +
+      '</div>';
+
+    overlay.innerHTML = '<div class="modal settings-modal">' +
+      '<button class="modal-close" onclick="closeSettings()" title="Schlie\u00DFen">&times;</button>' +
+      '<h3>Einstellungen</h3>' +
+      fieldsHtml +
+      '<div class="settings-actions">' +
+        '<button class="btn-primary" onclick="saveSettings()">Speichern</button>' +
+        '<button class="btn-outline" onclick="closeSettings()">Abbrechen</button>' +
+      '</div>' +
+      '<div class="settings-status" id="settingsStatus"></div>' +
+    '</div>';
+
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', settingsKeyHandler);
+  }).catch(function(e) {
+    console.error('Einstellungen laden fehlgeschlagen', e);
+  });
+}
+
+function closeSettings() {
+  var el = document.getElementById('settingsModal');
+  if (el) el.remove();
+  document.removeEventListener('keydown', settingsKeyHandler);
+}
+
+function settingsKeyHandler(e) {
+  if (e.key === 'Escape') closeSettings();
+}
+
+function saveSettings() {
+  var payload = {};
+  for (var i = 0; i < SETTINGS_FIELDS.length; i++) {
+    var f = SETTINGS_FIELDS[i];
+    var input = document.getElementById('cfg_' + f.key);
+    if (input) payload[f.key] = Number(input.value);
+  }
+  var statusEl = document.getElementById('settingsStatus');
+  if (statusEl) { statusEl.className = 'settings-status'; statusEl.textContent = ''; }
+
+  fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      if (statusEl) {
+        if (res.ok && res.data.ok) {
+          statusEl.className = 'settings-status ok';
+          statusEl.textContent = 'Einstellungen gespeichert!';
+          setTimeout(closeSettings, 1200);
+        } else {
+          statusEl.className = 'settings-status err';
+          statusEl.textContent = res.data.error || 'Fehler beim Speichern';
+        }
+      }
+    }).catch(function(e) {
+      if (statusEl) {
+        statusEl.className = 'settings-status err';
+        statusEl.textContent = 'Netzwerkfehler: ' + e.message;
+      }
+    });
+}
+
 }
 
 // ── Init ─────────────────────────────────────────────────────

@@ -4,6 +4,9 @@ const { EventEmitter } = require('events');
 const path = require('path');
 const fs = require('fs');
 const fsp = require('fs').promises;
+const http = require('http');
+const https = require('https');
+const { URL } = require('url');
 const logger = require('./src/logger');
 
 const PROJECTS_DIR = path.join(__dirname, 'projects');
@@ -264,7 +267,34 @@ function _runClaudeWithRetry(prompt, workDir, emitter, activeProcesses, signal, 
   });
 }
 
-// ── JSON-Validierung für Koordinator-Plan ─────────────────────
+// ── Zirkulaere Abhaengigkeiten erkennen ───────────────────────
+function detectCircularDeps(tasks) {
+  const taskCount = tasks.length;
+  const adj = new Array(taskCount).fill(null).map(() => []);
+  for (let i = 0; i < taskCount; i++) {
+    const deps = tasks[i].depends_on || [];
+    for (const d of deps) {
+      if (d >= 0 && d < taskCount) adj[d].push(i);
+    }
+  }
+  const WHITE = 0, GRAY = 1, BLACK = 2;
+  const color = new Array(taskCount).fill(WHITE);
+  const circular = new Set();
+  function dfs(u) {
+    color[u] = GRAY;
+    for (const v of adj[u]) {
+      if (color[v] === GRAY) { circular.add(u); circular.add(v); }
+      else if (color[v] === WHITE) { dfs(v); }
+    }
+    color[u] = BLACK;
+  }
+  for (let i = 0; i < taskCount; i++) {
+    if (color[i] === WHITE) dfs(i);
+  }
+  return circular;
+}
+
+// ── JSON-Validierung fuer Koordinator-Plan ────────────────────
 function validatePlan(parsed) {
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('Koordinator-Ausgabe ist kein gültiges Objekt');
@@ -279,6 +309,27 @@ function validatePlan(parsed) {
     const t = parsed.tasks[i];
     if (!t.title || !t.task || !t.deliverable) {
       throw new Error(`Task ${i + 1} fehlt title, task oder deliverable`);
+    }
+    // depends_on validieren (optional)
+    if (t.depends_on !== undefined) {
+      if (!Array.isArray(t.depends_on)) {
+        t.depends_on = [];
+      } else {
+        t.depends_on = t.depends_on
+          .filter(d => Number.isInteger(d) && d >= 0 && d < parsed.tasks.length && d !== i);
+      }
+    } else {
+      t.depends_on = [];
+    }
+  }
+  // Zirkulaere Abhaengigkeiten erkennen und bereinigen
+  const circularNodes = detectCircularDeps(parsed.tasks);
+  if (circularNodes.size > 0) {
+    logger.warn('Zirkulaere Abhaengigkeiten erkannt, werden entfernt', {
+      betroffeneAgenten: [...circularNodes].map(i => i + 1)
+    });
+    for (const idx of circularNodes) {
+      parsed.tasks[idx].depends_on = [];
     }
   }
   return parsed;
@@ -319,6 +370,56 @@ class Orchestrator extends EventEmitter {
       await this.hooks[name](data);
     } catch (e) {
       logger.warn('Hook-Fehler', { hook: name, error: e.message });
+    }
+  }
+
+  // ── Webhook-Benachrichtigung senden ──────────────────────────
+  async _sendWebhook(event, data) {
+    const webhookUrl = process.env.WEBHOOK_URL;
+    if (!webhookUrl) return;
+
+    try {
+      const parsed = new URL(webhookUrl);
+      const transport = parsed.protocol === 'https:' ? https : http;
+
+      const payload = JSON.stringify({
+        event,
+        data,
+        projectId: this.projectId,
+        timestamp: new Date().toISOString(),
+      });
+
+      const options = {
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+        timeout: 5000,
+      };
+
+      await new Promise((resolve, reject) => {
+        const req = transport.request(options, (res) => {
+          // Antwort verwerfen, uns interessiert nur ob es ankam
+          res.resume();
+          resolve();
+        });
+        req.on('error', (err) => reject(err));
+        req.on('timeout', () => {
+          req.destroy();
+          reject(new Error('Webhook Timeout nach 5s'));
+        });
+        req.write(payload);
+        req.end();
+      });
+
+      logger.info('Webhook gesendet', { event, url: parsed.hostname });
+    } catch (e) {
+      // Webhook-Fehler dürfen NIEMALS den Hauptprozess crashen
+      logger.warn('Webhook-Fehler', { event, error: e.message });
     }
   }
 
@@ -421,7 +522,8 @@ class Orchestrator extends EventEmitter {
     // Agents-Array anpassen
     this.agents = tasks.map((task, i) => ({
       id: i, title: task.title, task: task.task, deliverable: task.deliverable,
-      role: task.role || '', status: 'waiting', conversation: [], rounds: 0,
+      role: task.role || '', depends_on: task.depends_on || [],
+      status: 'waiting', conversation: [], rounds: 0,
       questions: 0, startTime: null, endTime: null, duration: null,
       workDir: path.join(this.projectDir, `agent-${i + 1}`)
     }));
@@ -496,6 +598,7 @@ class Orchestrator extends EventEmitter {
       await this._runHook('beforePlan', { description: this.projectDesc, agentCount: clampedCount });
       await this._coordinatorPlan(clampedCount);
       await this._runHook('afterPlan', { tasks: this.tasks, projectTitle: this.projectTitle });
+      await this._sendWebhook('project_started', { title: this.projectTitle, agentCount: this.tasks.length });
     } catch (e) {
       if (this._abortController.signal.aborted) return;
       this.coordStatus = 'error';
@@ -526,50 +629,83 @@ class Orchestrator extends EventEmitter {
           if (e.code === 'ENOSPC') throw new Error('Kein Speicherplatz mehr verfügbar');
           throw e;
         }
-        this._patchAgent(i, { title: task.title, task: task.task, deliverable: task.deliverable, role: task.role || '', workDir: agentDir });
+        this._patchAgent(i, { title: task.title, task: task.task, deliverable: task.deliverable, role: task.role || '', depends_on: task.depends_on || [], workDir: agentDir });
       }
       this.phase = 'running';
       this.emit('phase', { phase: 'running', startedAt: this.startedAt });
       await this._saveState();
     }
 
-    // Schritt 2: Agenten parallel ausführen (mit Semaphore)
+    // Schritt 2: Agenten mit Abhaengigkeiten und Semaphore ausfuehren
     this._checkAborted();
     const semaphore = new Semaphore(CONFIG.concurrency);
-    const agentPromises = this.tasks.map((_, i) => (async () => {
-      await semaphore.acquire();
-      try {
-        this._checkAborted();
-        await this._runHook('beforeAgent', { index: i, task: this.tasks[i], role: this.tasks[i].role || '' });
-        await this._runAgent(i);
-        // afterAgent: Dateien im Agent-Verzeichnis auflesen
-        let agentFiles = [];
-        try { agentFiles = fs.readdirSync(this.agents[i].workDir).filter(f => f !== 'conversation.jsonl'); } catch {}
-        await this._runHook('afterAgent', { index: i, status: this.agents[i].status, duration: this.agents[i].duration, files: agentFiles });
-      } catch (e) {
-        if (!this._abortController.signal.aborted) {
-          logger.error('Agent-Fehler', { agent: i + 1, error: e.message });
-          this._patchAgent(i, { status: 'error' });
-          this._addAgentMsg(i, { from: 'agent', text: `Fehler: ${sanitizeError(e.message)}`, type: 'work' });
-          await this._runHook('onError', { phase: `agent-${i + 1}`, error: e });
-        }
-      } finally {
-        semaphore.release();
-      }
-    })());
+    const taskCount = this.tasks.length;
+    const agentCompletions = new Array(taskCount);
 
-    await Promise.allSettled(agentPromises);
+    for (let i = 0; i < taskCount; i++) {
+      agentCompletions[i] = (async () => {
+        // Auf Abhaengigkeiten warten
+        const deps = this.tasks[i].depends_on || [];
+        if (deps.length > 0) {
+          const validDeps = deps.filter(d => d >= 0 && d < taskCount && d !== i);
+          if (validDeps.length > 0) {
+            const depsLabel = validDeps.map(d => `Agent ${d + 1}`).join(', ');
+            this._patchAgent(i, { status: 'waiting_deps', waitingFor: depsLabel });
+            // Warte auf alle Abhaengigkeiten (auch fehlgeschlagene)
+            const results = await Promise.allSettled(validDeps.map(d => agentCompletions[d]));
+            // Warnung wenn eine Abhaengigkeit fehlgeschlagen ist
+            for (let r = 0; r < results.length; r++) {
+              if (results[r].status === 'rejected' || (this.agents[validDeps[r]] && this.agents[validDeps[r]].status === 'error')) {
+                logger.warn('Abhaengigkeit fehlgeschlagen, Agent startet trotzdem', {
+                  agent: i + 1, failedDep: validDeps[r] + 1
+                });
+              }
+            }
+          }
+        }
+        // Dann Semaphore holen und ausfuehren
+        await semaphore.acquire();
+        try {
+          this._checkAborted();
+          await this._runHook('beforeAgent', { index: i, task: this.tasks[i], role: this.tasks[i].role || '' });
+          await this._runAgent(i);
+          let agentFiles = [];
+          try { agentFiles = fs.readdirSync(this.agents[i].workDir).filter(f => f !== 'conversation.jsonl'); } catch {}
+          await this._runHook('afterAgent', { index: i, status: this.agents[i].status, duration: this.agents[i].duration, files: agentFiles });
+        } catch (e) {
+          if (!this._abortController.signal.aborted) {
+            logger.error('Agent-Fehler', { agent: i + 1, error: e.message });
+            this._patchAgent(i, { status: 'error' });
+            this._addAgentMsg(i, { from: 'agent', text: `Fehler: ${sanitizeError(e.message)}`, type: 'work' });
+            await this._sendWebhook('agent_error', { agentIndex: i, task: this.tasks[i]?.title || '', error: sanitizeError(e.message) });
+            await this._runHook('onError', { phase: `agent-${i + 1}`, error: e });
+          }
+        } finally {
+          semaphore.release();
+        }
+      })();
+    }
+
+    await Promise.allSettled(agentCompletions);
 
     if (this._abortController.signal.aborted) return;
 
     // Koordinator-Zusammenfassung erstellen
     await this._coordinatorSummary();
 
+    // Agenten-Outputs zusammenführen
+    await this._mergeOutputs();
+
     this.phase = 'complete';
     this.completedAt = Date.now();
     this.totalDuration = Math.round((this.completedAt - (this.startedAt || this.completedAt)) / 1000);
     logger.info('Projekt abgeschlossen', { projectId: this.projectId, agents: this.tasks.length, totalDuration: this.totalDuration });
     this.emit('phase', { phase: 'complete', totalDuration: this.totalDuration });
+    await this._sendWebhook('project_completed', {
+      title: this.projectTitle,
+      totalDuration: this.totalDuration,
+      agents: this.agents.map(a => ({ title: a.title, status: a.status })),
+    });
     await this._runHook('onComplete', { projectId: this.projectId, totalDuration: this.totalDuration, agents: this.agents });
     await this._saveState();
   }
@@ -577,16 +713,18 @@ class Orchestrator extends EventEmitter {
   // ── Koordinator: Aufgaben planen ────────────────────────────
   async _coordinatorPlan(agentCount) {
     const prompt =
-`Du bist Projekt-Koordinator. Analysiere das Projekt und erstelle genau ${agentCount} parallele, unabhängige Teilaufgaben.
+`Du bist Projekt-Koordinator. Analysiere das Projekt und erstelle genau ${agentCount} Teilaufgaben.
 
 Constraints:
-- Jede Aufgabe MUSS unabhängig von den anderen sein (keine Abhängigkeiten!)
+- Aufgaben sollen moeglichst unabhaengig sein
+- Falls eine Aufgabe auf das Ergebnis einer anderen angewiesen ist, nutze "depends_on" mit den 0-basierten Indizes der Abhaengigkeiten
+- Aufgaben ohne Abhaengigkeiten bekommen ein leeres Array: "depends_on":[]
 - Jede Task-Beschreibung soll 100-500 Zeichen lang sein
-- Keine Überlappung zwischen den Aufgaben
-- Jede Aufgabe soll verschiedene Fähigkeiten/Bereiche abdecken
+- Keine Ueberlappung zwischen den Aufgaben
+- Jede Aufgabe soll verschiedene Faehigkeiten/Bereiche abdecken
 
 Antworte NUR mit validem JSON (kein Markdown, kein Text davor/danach):
-{"project_title":"string","summary":"1-2 Sätze auf Deutsch","quality_notes":"Kurze Begründung warum die Aufgaben unabhängig sind","tasks":[{"title":"Kurztitel","task":"Detaillierte Aufgabe","deliverable":"Was der Agent liefern soll","role":"Passende Rolle, z.B. Backend-Entwickler, Frontend-Entwickler, DevOps-Ingenieur, etc."}]}
+{"project_title":"string","summary":"1-2 Saetze auf Deutsch","quality_notes":"Kurze Begruendung der Aufgabenstruktur","tasks":[{"title":"Kurztitel","task":"Detaillierte Aufgabe","deliverable":"Was der Agent liefern soll","role":"Passende Rolle, z.B. Backend-Entwickler, Frontend-Entwickler, DevOps-Ingenieur, etc.","depends_on":[]}]}
 
 Projekt: ${this.projectDesc}`;
 
@@ -622,10 +760,10 @@ Projekt: ${this.projectDesc}`;
         if (e.code === 'ENOSPC') throw new Error('Kein Speicherplatz mehr verfügbar');
         throw e;
       }
-      this._patchAgent(i, { title: task.title, task: task.task, deliverable: task.deliverable, role: task.role || '', workDir: agentDir });
+      this._patchAgent(i, { title: task.title, task: task.task, deliverable: task.deliverable, role: task.role || '', depends_on: task.depends_on || [], workDir: agentDir });
     }
 
-    // Projekt-Übersicht speichern
+    // Projekt-Uebersicht speichern
     try {
       await fsp.writeFile(path.join(this.projectDir, 'project.md'),
         `# ${this.projectTitle}\n\n${this.projectSummary}\n\n## Agenten\n${this.tasks.map((t, i) => `- Agent ${i + 1}: ${t.title}`).join('\n')}\n`);
@@ -836,6 +974,89 @@ Antworte in 3-6 Sätzen, klar und konkret.`;
     }
   }
 
+  // ── Agenten-Outputs zusammenführen ──────────────────────────
+  async _mergeOutputs() {
+    try {
+      const mergedDir = path.join(this.projectDir, 'merged');
+      await fsp.mkdir(mergedDir, { recursive: true });
+
+      const SKIP_FILES = new Set(['conversation.jsonl', 'task.md', 'transcript.md']);
+      const mergedFiles = [];
+      const fileTracker = new Map(); // Dateiname → Agent-Index (für Konflikterkennung)
+
+      for (let i = 0; i < this.agents.length; i++) {
+        const agent = this.agents[i];
+        if (!agent.workDir) continue;
+
+        let entries;
+        try {
+          entries = fs.readdirSync(agent.workDir, { withFileTypes: true });
+        } catch {
+          continue;
+        }
+
+        for (const entry of entries) {
+          if (entry.isDirectory() || SKIP_FILES.has(entry.name)) continue;
+
+          const srcPath = path.join(agent.workDir, entry.name);
+          let destName = entry.name;
+
+          // Konflikt: gleicher Dateiname von anderem Agent
+          if (fileTracker.has(entry.name)) {
+            // Vorherige Datei umbenennen falls noch nicht geschehen
+            const prevIdx = fileTracker.get(entry.name);
+            if (prevIdx !== -1) {
+              const prevDest = path.join(mergedDir, entry.name);
+              const renamedPrev = `agent-${prevIdx + 1}_${entry.name}`;
+              try {
+                await fsp.rename(prevDest, path.join(mergedDir, renamedPrev));
+                // In mergedFiles aktualisieren
+                const fi = mergedFiles.findIndex(f => f === entry.name);
+                if (fi !== -1) mergedFiles[fi] = renamedPrev;
+              } catch {}
+              fileTracker.set(entry.name, -1); // markiert als bereits umbenannt
+            }
+            destName = `agent-${i + 1}_${entry.name}`;
+          } else {
+            fileTracker.set(entry.name, i);
+          }
+
+          try {
+            await fsp.copyFile(srcPath, path.join(mergedDir, destName));
+            mergedFiles.push(destName);
+          } catch {}
+        }
+      }
+
+      // README.md erstellen
+      let readme = `# ${this.projectTitle || 'Projekt'}\n\n`;
+      readme += `${this.projectSummary || ''}\n\n`;
+      readme += `## Agenten-Beiträge\n\n`;
+
+      for (let i = 0; i < this.agents.length; i++) {
+        const agent = this.agents[i];
+        const task = this.tasks[i];
+        readme += `### Agent ${i + 1}: ${agent.title || 'Unbekannt'}\n`;
+        readme += `- **Aufgabe:** ${task ? task.task : 'n/a'}\n`;
+        readme += `- **Lieferergebnis:** ${task ? task.deliverable : 'n/a'}\n`;
+        readme += `- **Status:** ${agent.status || 'unbekannt'}\n\n`;
+      }
+
+      readme += `## Dateien\n\n`;
+      for (const f of mergedFiles) {
+        readme += `- ${f}\n`;
+      }
+
+      await fsp.writeFile(path.join(mergedDir, 'README.md'), readme);
+      mergedFiles.push('README.md');
+
+      logger.info('Merge abgeschlossen', { files: mergedFiles.length, dir: mergedDir });
+      this.emit('merge_complete', { files: mergedFiles, dir: mergedDir });
+    } catch (e) {
+      logger.warn('Merge fehlgeschlagen', { error: e.message });
+    }
+  }
+
   // ── Einzelnen Agenten neu starten ───────────────────────────
   async retryAgent(idx) {
     if (idx < 0 || idx >= this.tasks.length) throw new Error('Ungültiger Agent-Index');
@@ -917,5 +1138,52 @@ Antworte in 3-6 Sätzen, klar und konkret.`;
     this.emit('agent_msg', { index: i, msg });
   }
 }
+
+// ── Konfiguration lesen und aktualisieren ─────────────────────
+Orchestrator.prototype.getConfig = function() {
+  return {
+    agentTimeout: CONFIG.timeout,
+    maxRetries: CONFIG.maxRetries,
+    retryBaseDelay: CONFIG.baseDelay,
+    maxAgents: CONFIG.maxAgents,
+    concurrency: CONFIG.concurrency,
+    maxRounds: CONFIG.maxRounds,
+    webhookUrl: process.env.WEBHOOK_URL
+      ? process.env.WEBHOOK_URL.replace(/^(https?:\/\/[^/]{4})[^/]*/, '$1***')
+      : ''
+  };
+};
+
+Orchestrator.prototype.updateConfig = function(patch) {
+  const RULES = {
+    agentTimeout:   { key: 'timeout',    min: 30000,  max: 1800000 },
+    maxRetries:     { key: 'maxRetries',  min: 0,      max: 20 },
+    retryBaseDelay: { key: 'baseDelay',   min: 1000,   max: 60000 },
+    maxAgents:      { key: 'maxAgents',   min: 1,      max: 50 },
+    concurrency:    { key: 'concurrency', min: 1,      max: 20 },
+    maxRounds:      { key: 'maxRounds',   min: 1,      max: 20 },
+  };
+
+  const errors = [];
+  for (const [field, val] of Object.entries(patch)) {
+    if (field === 'webhookUrl') {
+      continue;
+    }
+    const rule = RULES[field];
+    if (!rule) {
+      errors.push(`Unbekanntes Feld: ${field}`);
+      continue;
+    }
+    const num = Number(val);
+    if (!Number.isFinite(num) || num < rule.min || num > rule.max) {
+      errors.push(`${field} muss zwischen ${rule.min} und ${rule.max} liegen`);
+      continue;
+    }
+    CONFIG[rule.key] = Math.round(num);
+  }
+  if (errors.length) {
+    throw new Error(errors.join('; '));
+  }
+};
 
 module.exports = Orchestrator;

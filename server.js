@@ -245,6 +245,106 @@ app.get('/api/projects/:id', (req, res) => {
   }
 });
 
+// ── Projekt löschen ─────────────────────────────────────────
+app.delete('/api/projects/:id', apiLimiter, (req, res) => {
+  const id = req.params.id;
+  if (!id.startsWith('proj_')) {
+    return res.status(400).json({ error: 'Ungültige Projekt-ID' });
+  }
+  const dir = path.join(__dirname, 'projects', id);
+  // Pfad-Traversal verhindern
+  if (!dir.startsWith(path.join(__dirname, 'projects'))) {
+    return res.status(400).json({ error: 'Ungültiger Pfad' });
+  }
+  if (!fs.existsSync(dir)) {
+    return res.status(404).json({ error: 'Projekt nicht gefunden' });
+  }
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+    logger.info('Projekt gelöscht', { id });
+    res.json({ ok: true, deleted: id });
+  } catch (e) {
+    logger.error('Projekt löschen fehlgeschlagen', { id, error: e.message });
+    res.status(500).json({ error: 'Löschen fehlgeschlagen: ' + e.message });
+  }
+});
+
+// ── Alte Projekte aufräumen ─────────────────────────────────
+app.post('/api/cleanup', apiLimiter, (req, res) => {
+  const dir = path.join(__dirname, 'projects');
+  if (!fs.existsSync(dir)) return res.json({ ok: true, deleted: [], count: 0 });
+
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const deleted = [];
+
+  fs.readdirSync(dir)
+    .filter(d => d.startsWith('proj_'))
+    .forEach(d => {
+      const ts = parseInt(d.replace('proj_', ''));
+      if (!isNaN(ts) && (now - ts) > sevenDaysMs) {
+        const fullPath = path.join(dir, d);
+        // Pfad-Traversal verhindern
+        if (fullPath.startsWith(path.join(__dirname, 'projects'))) {
+          try {
+            fs.rmSync(fullPath, { recursive: true, force: true });
+            deleted.push(d);
+          } catch (e) {
+            logger.error('Aufräumen: Löschen fehlgeschlagen', { id: d, error: e.message });
+          }
+        }
+      }
+    });
+
+  logger.info('Alte Projekte aufgeräumt', { count: deleted.length, deleted });
+  res.json({ ok: true, deleted, count: deleted.length });
+});
+
+// ── Speicherplatz-Info ──────────────────────────────────────
+app.get('/api/disk-usage', (req, res) => {
+  const dir = path.join(__dirname, 'projects');
+  if (!fs.existsSync(dir)) {
+    return res.json({ totalSize: '0 MB', projectCount: 0, oldestProject: null, newestProject: null });
+  }
+
+  function getDirSize(d) {
+    let size = 0;
+    try {
+      const entries = fs.readdirSync(d, { withFileTypes: true });
+      for (const e of entries) {
+        const full = path.join(d, e.name);
+        if (e.isDirectory()) {
+          size += getDirSize(full);
+        } else {
+          try { size += fs.statSync(full).size; } catch {}
+        }
+      }
+    } catch {}
+    return size;
+  }
+
+  const projects = fs.readdirSync(dir).filter(d => d.startsWith('proj_'));
+  const totalSize = getDirSize(dir);
+  const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+
+  let oldest = null;
+  let newest = null;
+  projects.forEach(d => {
+    const ts = parseInt(d.replace('proj_', ''));
+    if (!isNaN(ts)) {
+      if (!oldest || ts < oldest.ts) oldest = { id: d, ts };
+      if (!newest || ts > newest.ts) newest = { id: d, ts };
+    }
+  });
+
+  res.json({
+    totalSize: sizeMB + ' MB',
+    projectCount: projects.length,
+    oldestProject: oldest ? oldest.id : null,
+    newestProject: newest ? newest.id : null
+  });
+});
+
 // ── Dateibaum API ────────────────────────────────────────────
 app.get('/api/files/:id', (req, res) => {
   const dir = path.join(__dirname, 'projects', req.params.id);
@@ -296,6 +396,28 @@ app.get('/api/export/:id', (req, res) => {
   archive.finalize();
 });
 
+// ── Zusammengeführte Dateien ──────────────────────────────────
+app.get('/api/merged/:id', (req, res) => {
+  const dir = path.join(__dirname, 'projects', req.params.id, 'merged');
+  // Pfad-Traversal verhindern
+  if (!dir.startsWith(path.join(__dirname, 'projects'))) {
+    return res.status(400).json({ error: 'Ungültiger Pfad' });
+  }
+  if (!fs.existsSync(dir)) {
+    return res.status(404).json({ error: 'Zusammengeführte Dateien nicht gefunden' });
+  }
+
+  try {
+    const files = fs.readdirSync(dir).map(name => {
+      const stat = fs.statSync(path.join(dir, name));
+      return { name, size: stat.size };
+    });
+    res.json({ files, dir });
+  } catch (e) {
+    res.status(500).json({ error: 'Fehler beim Lesen der zusammengeführten Dateien' });
+  }
+});
+
 // ── Plan Genehmigung ─────────────────────────────────────────
 app.post('/api/approve', apiLimiter, (req, res) => {
   try {
@@ -314,6 +436,20 @@ app.post('/api/modify-plan', apiLimiter, (req, res) => {
     }
     orchestrator.modifyPlan(tasks);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// ── Konfiguration ───────────────────────────────────────────────
+app.get('/api/config', (req, res) => {
+  res.json(orchestrator.getConfig());
+});
+
+app.post('/api/config', apiLimiter, (req, res) => {
+  try {
+    orchestrator.updateConfig(req.body);
+    res.json({ ok: true, config: orchestrator.getConfig() });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
