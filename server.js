@@ -1310,8 +1310,8 @@ async function computeAnalytics() {
     topStats: { bestProject: null, worstProject: null, fastestProject: null, longestProject: null },
     distribution: {
       scoreBuckets: [
-        { range: '0-20', count: 0 }, { range: '21-40', count: 0 }, { range: '41-60', count: 0 },
-        { range: '61-80', count: 0 }, { range: '81-100', count: 0 }
+        { range: '0-25', count: 0 }, { range: '26-50', count: 0 },
+        { range: '51-75', count: 0 }, { range: '76-100', count: 0 }
       ],
       durationBuckets: [
         { range: '0-60s', count: 0 }, { range: '61-120s', count: 0 }, { range: '121-300s', count: 0 },
@@ -1419,8 +1419,8 @@ async function computeAnalytics() {
 
   // ── Distribution ──
   const scoreBuckets = [
-    { range: '0-20', count: 0 }, { range: '21-40', count: 0 }, { range: '41-60', count: 0 },
-    { range: '61-80', count: 0 }, { range: '81-100', count: 0 }
+    { range: '0-25', count: 0 }, { range: '26-50', count: 0 },
+    { range: '51-75', count: 0 }, { range: '76-100', count: 0 }
   ];
   const durationBuckets = [
     { range: '0-60s', count: 0 }, { range: '61-120s', count: 0 }, { range: '121-300s', count: 0 },
@@ -1429,11 +1429,10 @@ async function computeAnalytics() {
   for (const s of states) {
     if (s.projectScore != null) {
       const sc = s.projectScore;
-      if (sc <= 20) scoreBuckets[0].count++;
-      else if (sc <= 40) scoreBuckets[1].count++;
-      else if (sc <= 60) scoreBuckets[2].count++;
-      else if (sc <= 80) scoreBuckets[3].count++;
-      else scoreBuckets[4].count++;
+      if (sc <= 25) scoreBuckets[0].count++;
+      else if (sc <= 50) scoreBuckets[1].count++;
+      else if (sc <= 75) scoreBuckets[2].count++;
+      else scoreBuckets[3].count++;
     }
     if (s.totalDuration != null) {
       const dur = s.totalDuration;
@@ -1445,7 +1444,8 @@ async function computeAnalytics() {
     }
   }
 
-  return { timeline, roleStats, costEfficiency, topStats, distribution: { scoreBuckets, durationBuckets } };
+  const avgAgentsPerProject = states.length > 0 ? parseFloat((totalAgents / states.length).toFixed(1)) : 0;
+  return { timeline, roleStats, costEfficiency, topStats, distribution: { scoreBuckets, durationBuckets }, avgAgentsPerProject };
 }
 
 app.get('/api/analytics', apiReadLimiter, async (req, res) => {

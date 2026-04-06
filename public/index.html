@@ -518,6 +518,13 @@
   .partial-path { font-size: 11px; font-family: var(--mono); color: var(--amber-dark); opacity: 0.7; margin-top: 4px; }
   .partial-retry-btns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 
+  /* ── Error Banner ────────────────────────────────────────── */
+  .error-banner { position: fixed; top: 0; left: 0; right: 0; padding: 10px 16px; font-size: 13px; text-align: center; z-index: 9999; background: var(--red-bg); color: var(--red); display: none; align-items: center; justify-content: center; gap: 12px; }
+  .error-banner.visible { display: flex; }
+  .error-banner button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding: 4px 12px; font-size: 12px; font-weight: 600; }
+  .error-banner .error-banner-reload { background: var(--red); color: #fff; }
+  .error-banner .error-banner-dismiss { background: transparent; color: var(--red); text-decoration: underline; }
+
   /* ── Connection bar ────────────────────────────────────── */
   .conn-bar { position: fixed; top: 0; left: 0; right: 0; padding: 6px 16px;
     font-size: 12px; text-align: center; z-index: 100; transition: all 0.3s ease; transform: translateY(-100%); }
@@ -666,6 +673,10 @@
   .budget-cost { font-size: 11px; color: var(--green); font-weight: 600; margin-top: 2px; font-family: var(--mono); }
   .budget-exceeded-banner { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; font-weight: 500; margin-top: 6px; }
   .budget-warning-banner { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; font-weight: 500; margin-top: 6px; }
+
+  .cost-banner { border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; font-weight: 500; margin-top: 6px; }
+  .cost-banner.warn { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); }
+  .cost-banner.error { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
 
   /* ── Agent Token Badge ──────────────────────────────────── */
   .agent-token-info { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--txt3); margin-left: 6px; }
@@ -2688,6 +2699,11 @@
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
 </head>
 <body>
+<div class="error-banner" id="errorBanner" role="alert" aria-live="assertive">
+  <span id="errorBannerMsg">Ein unerwarteter Fehler ist aufgetreten.</span>
+  <button class="error-banner-reload" onclick="location.reload()">Seite neu laden</button>
+  <button class="error-banner-dismiss" id="errorBannerDismiss" onclick="_dismissErrorBanner()">Schliessen</button>
+</div>
 <div class="conn-bar" id="connBar" role="status" aria-live="assertive"></div>
 <div class="conn-badge offline" id="connBadge" title="Verbindungstyp">--</div>
 <div class="top-controls">
@@ -2716,8 +2732,28 @@
   <button onclick="exitPrintPreview()">Vorschau beenden</button>
 </div>
 <div id="app" role="main"></div>
+<div id="costBanner" class="cost-banner" style="display:none;" role="alert"></div>
 <div id="a11yAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
+<script>
+// ── Error Boundary ──────────────────────────────────────────────
+function _showErrorBanner(msg) {
+  var banner = document.getElementById("errorBanner");
+  if (!banner) return;
+  if (msg) document.getElementById("errorBannerMsg").textContent = msg;
+  banner.classList.add("visible");
+}
+function _dismissErrorBanner() {
+  var banner = document.getElementById("errorBanner");
+  if (banner) banner.classList.remove("visible");
+}
+window.onerror = function(message) {
+  _showErrorBanner(message || "Ein unerwarteter Fehler ist aufgetreten.");
+};
+window.addEventListener("unhandledrejection", function(e) {
+  _showErrorBanner(e.reason ? String(e.reason) : "Ein unerwarteter Fehler ist aufgetreten.");
+});
+</script>
 <script>
 // ── XSS Schutz ───────────────────────────────────────────────
 // escapeHtml: Escaped &, <, >, ", ' fuer sicheres Einsetzen in HTML und Attribute
@@ -3549,6 +3585,22 @@ function addBanner(type, text) {
 function dismissBanner(id) {
   banners = banners.filter(function(b) { return b.id !== id; });
   renderBanners();
+}
+
+function showCostBanner(type, text) {
+  var el = document.getElementById('costBanner');
+  if (!el) return;
+  el.className = 'cost-banner ' + (type === 'error' ? 'error' : 'warn');
+  el.textContent = text;
+  el.style.display = '';
+}
+
+function dismissCostBanner() {
+  var el = document.getElementById('costBanner');
+  if (!el) return;
+  el.style.display = 'none';
+  el.textContent = '';
+  el.className = 'cost-banner';
 }
 
 function renderBanners() {
@@ -5336,11 +5388,9 @@ function renderDashboard() {
       '<div style="flex:1">' +
         '<div class="complete-title">\u2713 Alle ' + esc(String(total)) + ' Agenten abgeschlossen' + (state.projectScore != null ? ' <span class="score-project">' + scoreBadge(state.projectScore) + ' Projekt-Score</span>' : '') + '</div>' +
         '<div class="complete-sub">' + esc(String(totalRounds)) + ' Runden \u00B7 ' + esc(String(totalQuestions)) + ' Frage' + (totalQuestions !== 1 ? 'n' : '') + ' \u00B7 ' + esc(String(total)) + ' Agenten' + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + projStatsText + (getTokenUsageTotals().totalTokens > 0 ? ' \u00B7 ' + esc(formatTokens(getTokenUsageTotals().totalTokens)) + ' Tokens \u00B7 ' + esc(formatCost(getTokenUsageTotals().estimatedCost)) : '') + '</div>' +
-        (state.projectDir ? '<div class="complete-path">' + esc(state.projectDir) + (state.projectId ? ' <button class="btn-copy-inline" onclick="copyToClipboard(state.projectId, 'Projekt-ID')" title="Projekt-ID kopieren">&#x2398;</button>' : '') + '</div>' : '') +
+        (state.projectDir ? '<div class="complete-path">' + esc(state.projectDir) + (state.projectId ? ' <button class="btn-copy-inline" onclick="copyToClipboard(state.projectId, &#39;Projekt-ID&#39;)" title="Projekt-ID kopieren">&#x2398;</button>' : '') + '</div>' : '') +
       '</div>' +
-      '<button class="btn-outline" onclick="exportProject()" title="Als ZIP herunterladen">ZIP</button> ' +
-      '<button class="btn-outline" onclick="exportProjectJSON()" title="Als JSON herunterladen">JSON</button> ' +
-      '<button class="btn-outline" onclick="exportProjectMarkdown()" title="Als Markdown herunterladen">MD</button> ' +
+      '<button class="btn-outline" onclick="openExportPreview()" title="Projekt exportieren">Export</button> ' +
       '<button class="btn-outline btn-print" onclick="window.print()">Drucken</button> ' +
       '<button class="btn-outline btn-print" onclick="togglePrintPreview()">Druckvorschau</button> ' +
       '<button class="btn-outline btn-print" onclick="generateReport()">Bericht erstellen</button> ' +
@@ -5368,7 +5418,7 @@ function renderDashboard() {
       '<div style="flex:1">' +
         '<div class="partial-title">\u26A0 ' + esc(String(successCount)) + ' von ' + esc(String(total)) + ' Agenten erfolgreich. ' + esc(String(failedCount)) + ' fehlgeschlagen.' + (state.projectScore != null ? ' <span class="score-project">' + scoreBadge(state.projectScore) + ' Projekt-Score</span>' : '') + '</div>' +
         '<div class="partial-sub">' + esc(String(totalRoundsP)) + ' Runden' + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + projStatsTextP + (getTokenUsageTotals().totalTokens > 0 ? ' \u00B7 ' + esc(formatTokens(getTokenUsageTotals().totalTokens)) + ' Tokens \u00B7 ' + esc(formatCost(getTokenUsageTotals().estimatedCost)) : '') + '</div>' +
-        (state.projectDir ? '<div class="partial-path">' + esc(state.projectDir) + (state.projectId ? ' <button class="btn-copy-inline" onclick="copyToClipboard(state.projectId, 'Projekt-ID')" title="Projekt-ID kopieren">&#x2398;</button>' : '') + '</div>' : '') +
+        (state.projectDir ? '<div class="partial-path">' + esc(state.projectDir) + (state.projectId ? ' <button class="btn-copy-inline" onclick="copyToClipboard(state.projectId, &#39;Projekt-ID&#39;)" title="Projekt-ID kopieren">&#x2398;</button>' : '') + '</div>' : '') +
         '<div class="partial-retry-btns">' +
           failedIdxs.map(function(idx) {
             return '<button class="btn-retry" aria-label="Agent erneut versuchen" onclick="retryAgent(' + idx + ')">Agent ' + (idx + 1) + ' wiederholen</button>';
@@ -5376,9 +5426,7 @@ function renderDashboard() {
         '</div>' +
       '</div>' +
       '<button class="btn-primary" onclick="resumeProject()">Fortsetzen</button> ' +
-      '<button class="btn-outline" onclick="exportProject()" title="Als ZIP herunterladen">ZIP</button> ' +
-      '<button class="btn-outline" onclick="exportProjectJSON()" title="Als JSON herunterladen">JSON</button> ' +
-      '<button class="btn-outline" onclick="exportProjectMarkdown()" title="Als Markdown herunterladen">MD</button> ' +
+      '<button class="btn-outline" onclick="openExportPreview()" title="Projekt exportieren">Export</button> ' +
       '<button class="btn-outline" onclick="loadMergedFiles()">Zusammengef\u00FChrte Dateien</button> ' +
       '<button class="btn-outline" onclick="cloneProject()">Erneut starten</button> ' +
       '<button class="btn-outline" onclick="resetProject()">Neues Projekt</button>' +
@@ -5396,11 +5444,11 @@ function renderDashboard() {
       '<div>' +
         '<div class="proj-title" id="projTitle">' + esc(state.projectTitle || 'Projekt l\u00E4uft\u2026') + '</div>' +
         (state.projectSummary ? '<div class="proj-summary" id="projSummary">' + esc(state.projectSummary) + '</div>' : '<div class="proj-summary" id="projSummary"></div>') +
-        '<div class="proj-path" id="projPath">' + esc(state.projectDir) + (state.projectId ? ' <button class="btn-copy-inline" onclick="copyToClipboard(state.projectId, 'Projekt-ID')" title="Projekt-ID kopieren">&#x2398;</button>' : '') + '</div>' +
+        '<div class="proj-path" id="projPath">' + esc(state.projectDir) + (state.projectId ? ' <button class="btn-copy-inline" onclick="copyToClipboard(state.projectId, &#39;Projekt-ID&#39;)" title="Projekt-ID kopieren">&#x2398;</button>' : '') + '</div>' +
       '</div>' +
       '<div class="stats-row">' +
         (isComplete
-          ? '<button class="btn-outline" onclick="exportProject()" title="Als ZIP herunterladen">ZIP</button> <button class="btn-outline" onclick="exportProjectJSON()" title="Als JSON herunterladen">JSON</button> <button class="btn-outline" onclick="exportProjectMarkdown()" title="Als Markdown herunterladen">MD</button> <button class="btn-outline" onclick="resetProject()">Neues Projekt</button>'
+          ? '<button class="btn-outline" onclick="openExportPreview()" title="Projekt exportieren">Export</button> <button class="btn-outline" onclick="resetProject()">Neues Projekt</button>'
           : '<div>' +
               '<div class="stat-label" id="statLabel" aria-live="polite">' + esc(done + ' / ' + total + ' fertig') + (working > 0 ? ' \u00B7 ' + esc(String(working)) + ' aktiv' : '') + ' \u00B7 ' + esc(String(totalQ)) + ' Dialoge</div>' +
               '<div style="font-size:11px;color:var(--txt3);margin-bottom:3px" id="elapsedTime">' + (state.startedAt ? esc(formatDuration(getElapsedSeconds())) : '') + '</div>' +
@@ -6700,7 +6748,7 @@ function renderAgent(agent, idx) {
     ((agent.status === 'working' || agent.status === 'asking' || agent.status === 'retrying') ? '<div class="agent-progress"><div class="agent-progress-fill ' + progressColorClass(agent.progress || 0) + '" id="agentProgressFill-' + idx + '" style="width:' + (agent.progress || 0) + '%"></div></div><div class="agent-eta" id="agentEta-' + idx + '">' + (agent.etaSeconds > 0 ? '<span class="agent-eta-countdown">' + esc(formatEta(agent.etaSeconds)) + '</span>' : '') + (agent._roundsLeft > 0 ? '<span>' + agent._roundsLeft + ' Runde' + (agent._roundsLeft > 1 ? 'n' : '') + ' verbl.</span>' : '') + '</div>' : '') +
     (agent.task ? '<div class="agent-task">' + esc(truncate(agent.task, 90)) + '</div>' : '') +
     '<div class="agent-conv" role="log" aria-live="polite" aria-label="Agent-Konversation"' + (allDetailsExpanded ? ' style="max-height:none"' : '') + '>' + bubbles + '</div>' +
-    '<div class="agent-foot"><span>' + (function(){var mc=(agent._msgSent||0)+(agent._msgRecv||0);return esc((agent.rounds||0)+' Runden \u00B7 '+(agent.questions||0)+' Fragen'+(mc>0?' \u00B7 '+(agent._msgSent||0)+'/3 Nachr.':'')+((agent.duration!=null)?' \u00B7 '+formatDuration(agent.duration):''))})() + (agent.status === 'done' && agent.stats ? ' \u00B7 ' + (agent.stats.filesCreated || 0) + ' Dateien \u00B7 ' + (agent.stats.linesOfCode || 0) + ' Zeilen \u00B7 ' + formatFileSize(agent.stats.totalFileSize || 0) : '') + renderAgentTokenInfo(agent) + '</span><span>' + interveneBtn + quickActions + retryBtn + ' + (agent.fileChanges && agent.fileChanges.length > 0 ? ' <button class=\"btn-diff\" onclick=\"event.stopPropagation();openAgentDiffModal(' + idx + ')\">Diff</button>' : '') + ' <a class="details-link" onclick="openAgentModal(' + idx + ')">Details</a></span></div>' +
+    '<div class="agent-foot"><span>' + (function(){var mc=(agent._msgSent||0)+(agent._msgRecv||0);return esc((agent.rounds||0)+' Runden \u00B7 '+(agent.questions||0)+' Fragen'+(mc>0?' \u00B7 '+(agent._msgSent||0)+'/3 Nachr.':'')+((agent.duration!=null)?' \u00B7 '+formatDuration(agent.duration):''))})() + (agent.status === 'done' && agent.stats ? ' \u00B7 ' + (agent.stats.filesCreated || 0) + ' Dateien \u00B7 ' + (agent.stats.linesOfCode || 0) + ' Zeilen \u00B7 ' + formatFileSize(agent.stats.totalFileSize || 0) : '') + renderAgentTokenInfo(agent) + '</span><span>' + interveneBtn + quickActions + retryBtn + (agent.fileChanges && agent.fileChanges.length > 0 ? ' <button class=\"btn-diff\" onclick=\"event.stopPropagation();openAgentDiffModal(' + idx + ')\">Diff</button>' : '') + ' <a class="details-link" onclick="openAgentModal(' + idx + ')">Details</a></span></div>' +
     historyHtml +
     interventionFormHtml +
   '</div>';
@@ -8304,6 +8352,58 @@ function exportProjectMarkdown() {
   window.open('/api/export-markdown/' + encodeURIComponent(id), '_blank');
 }
 
+
+function openExportPreview(projectIdOverride) {
+  var id = projectIdOverride || getProjectId();
+  if (!id) { addBanner('error', 'Keine Projekt-ID gefunden.'); return; }
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'exportPreviewModal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Export-Vorschau');
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  var title = state.projectTitle || 'Unbenanntes Projekt';
+  var summary = state.projectSummary || '';
+  var ps = state.projectStats || {};
+  var agents = state.agents || [];
+  var agentCount = agents.length;
+  var doneCount = agents.filter(function(a) { return a.status === 'done'; }).length;
+  var tok = getTokenUsageTotals();
+  overlay.innerHTML = '<div class="modal" style="max-width:480px">' +
+    '<button class="modal-close" onclick="document.getElementById(\'exportPreviewModal\').remove()" aria-label="Schliessen">&times;</button>' +
+    '<h3 style="margin:0 0 12px 0">Export-Vorschau</h3>' +
+    '<div style="margin-bottom:12px">' +
+      '<div style="font-weight:600;font-size:15px;margin-bottom:4px">' + esc(title) + '</div>' +
+      (summary ? '<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">' + esc(summary) + '</div>' : '') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">' +
+      '<div style="background:var(--bg2);border-radius:8px;padding:10px;text-align:center">' +
+        '<div style="font-size:20px;font-weight:700">' + (ps.totalFiles || 0) + '</div>' +
+        '<div style="font-size:10px;color:var(--txt3);text-transform:uppercase">Dateien</div>' +
+      '</div>' +
+      '<div style="background:var(--bg2);border-radius:8px;padding:10px;text-align:center">' +
+        '<div style="font-size:20px;font-weight:700">' + formatFileSize(ps.totalSize || 0) + '</div>' +
+        '<div style="font-size:10px;color:var(--txt3);text-transform:uppercase">Gesamtgroesse</div>' +
+      '</div>' +
+      '<div style="background:var(--bg2);border-radius:8px;padding:10px;text-align:center">' +
+        '<div style="font-size:20px;font-weight:700">' + doneCount + '/' + agentCount + '</div>' +
+        '<div style="font-size:10px;color:var(--txt3);text-transform:uppercase">Agenten</div>' +
+      '</div>' +
+      '<div style="background:var(--bg2);border-radius:8px;padding:10px;text-align:center">' +
+        '<div style="font-size:20px;font-weight:700">' + (ps.totalLines || 0) + '</div>' +
+        '<div style="font-size:10px;color:var(--txt3);text-transform:uppercase">Zeilen</div>' +
+      '</div>' +
+    '</div>' +
+    (tok.totalTokens > 0 ? '<div style="font-size:11px;color:var(--txt3);margin-bottom:12px;text-align:center">' + esc(formatTokens(tok.totalTokens)) + ' Tokens &middot; ' + esc(formatCost(tok.estimatedCost)) + '</div>' : '') +
+    '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
+      '<button class="btn-primary" onclick="exportProject();document.getElementById(\'exportPreviewModal\').remove()" style="min-width:90px">ZIP</button>' +
+      '<button class="btn-outline" onclick="exportProjectJSON();document.getElementById(\'exportPreviewModal\').remove()" style="min-width:90px">JSON</button>' +
+      '<button class="btn-outline" onclick="exportProjectMarkdown();document.getElementById(\'exportPreviewModal\').remove()" style="min-width:90px">Markdown</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(overlay);
+}
 
 // ── Druckvorschau ────────────────────────────────────────────
 function togglePrintPreview() { document.body.classList.toggle('print-preview'); }
@@ -10176,7 +10276,7 @@ var shortcutRegistry = [
     } },
   { key: 'e', ctrl: true, shift: false, category: 'Global', desc: 'ZIP exportieren',
     action: function() {
-      if (state.phase === 'complete' || state.phase === 'partial') { exportProject(); showToast('Export gestartet\u2026'); }
+      if (state.phase === 'complete' || state.phase === 'partial') { openExportPreview(); }
     } },
   { key: 'd', ctrl: true, shift: false, category: 'Global', desc: 'Theme umschalten (Light/Dark/Auto)',
     action: function() { toggleDarkMode(); showToast('Theme: ' + themeMode.charAt(0).toUpperCase() + themeMode.slice(1)); } },
@@ -10203,7 +10303,7 @@ var shortcutRegistry = [
     } },
   { key: 'e', ctrl: false, shift: false, category: 'Schnellzugriff', desc: 'ZIP exportieren (wenn fertig)', alwaysActive: false,
     action: function() {
-      if (state.phase === 'complete') { exportProject(); showToast('Export gestartet\u2026'); }
+      if (state.phase === 'complete') { openExportPreview(); }
     } },
   { key: 'l', ctrl: false, shift: false, category: 'Schnellzugriff', desc: 'Server-Logs anzeigen/schlie\u00DFen', alwaysActive: false,
     action: function() {
@@ -12089,9 +12189,7 @@ function diffModalKeyHandler(e) {
         if (ctxSnippet && ctxSnippet !== matchText) {
           html += '<div class="search-result-context">' + highlightMatch(ctxSnippet, q) + '</div>';
         } else if (item.context) {
-          var ctx = '';
-          if (item.context.before) ctx += esc(item.context.before.substring(0, 100)) + '
-';
+          if (item.context.before) ctx += esc(item.context.before.substring(0, 100)) + ' ';
           if (item.context.after) ctx += esc(item.context.after.substring(0, 100));
           if (ctx.trim()) {
             html += '<div class="search-result-context">' + ctx + '</div>';

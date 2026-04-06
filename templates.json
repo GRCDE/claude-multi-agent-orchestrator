@@ -34,6 +34,69 @@
       "description": "Erstelle eine Fullstack-Webanwendung mit Frontend (HTML/CSS/JS), Backend (Node.js/Express), Datenbank-Schema und Docker-Konfiguration.",
       "suggestedAgents": 5,
       "icon": "🌐"
+    },
+    {
+      "id": "tpl-1775502374001",
+      "name": "Tag-Test Template",
+      "description": "Template fuer Tag-Tests",
+      "suggestedAgents": 2,
+      "icon": "📄",
+      "tags": [
+        "test-tag-alpha",
+        "test-tag-beta"
+      ],
+      "createdAt": "2026-04-06T19:06:14.001Z",
+      "updatedAt": "2026-04-06T19:06:14.001Z"
+    },
+    {
+      "id": "tpl-1775502374004",
+      "name": "Tag-Liste Template",
+      "description": "Template fuer Tag-Listen-Test",
+      "suggestedAgents": 3,
+      "icon": "📄",
+      "tags": [
+        "liste-tag"
+      ],
+      "createdAt": "2026-04-06T19:06:14.004Z",
+      "updatedAt": "2026-04-06T19:06:14.004Z"
+    },
+    {
+      "id": "tpl-1775502374008",
+      "name": "Duplikat-Test 1",
+      "description": "Erster Duplikat-Test",
+      "suggestedAgents": 2,
+      "icon": "📄",
+      "tags": [
+        "duplikat-tag",
+        "einzigartig-eins"
+      ],
+      "createdAt": "2026-04-06T19:06:14.008Z",
+      "updatedAt": "2026-04-06T19:06:14.008Z"
+    },
+    {
+      "id": "tpl-1775502374010",
+      "name": "Duplikat-Test 2",
+      "description": "Zweiter Duplikat-Test",
+      "suggestedAgents": 2,
+      "icon": "📄",
+      "tags": [
+        "duplikat-tag",
+        "einzigartig-zwei"
+      ],
+      "createdAt": "2026-04-06T19:06:14.010Z",
+      "updatedAt": "2026-04-06T19:06:14.010Z"
+    },
+    {
+      "id": "tpl-1775505207529-0",
+      "name": "Importiertes Template",
+      "description": "Aus Import erstellt",
+      "suggestedAgents": 2,
+      "icon": "📦",
+      "tags": [
+        "import"
+      ],
+      "createdAt": "2026-04-06T19:53:27.529Z",
+      "updatedAt": "2026-04-06T19:53:27.529Z"
     }
   ],
   "taskPresets": [

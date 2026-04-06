@@ -14,22 +14,41 @@ Agenten-Outputs werden automatisch zusammengefuehrt.
 Browser (public/index.html)
     | WebSocket (/ws) + SSE (/api/stream) + REST (port 3131)
     v
-Express Server (server.js) ~4060 Zeilen
+Express Server (server.js) ~2455 Zeilen + src/routes/ ~3640 Zeilen
     - CORS, Rate-Limiting (differenziert: Read/Mutation/Start/Export)
     - Auth-Middleware (Bearer Token, timing-safe Vergleich)
     - Security Headers (CSP, HSTS, X-Frame-Options, etc.)
     - Compression (gzip), Input-Sanitierung
     - SSE Broadcast mit Event-Batching (100ms)
     - WebSocket Server (Dual-Mode: WS + SSE Fallback)
-    - REST API (129 Endpoints)
+    - REST API (123 Endpoints) + SSE + WebSocket
     - Performance-Metriken (CPU, Memory, Endpoint-Statistiken)
     - Project Queue mit Auto-Dequeue + Prioritaeten
     - Webhook-Dispatching (Event-basiert, HMAC-SHA256 Signatur)
     - Crash-Recovery (Checkpoint-basiert)
     - Projektuebergreifende Volltextsuche
     - Async File I/O (komplett, 0 sync fs-Aufrufe)
+    - Modulare Route-Handler in src/routes/ (11 Module)
     v
-Orchestrator (orchestrator.js) ~4240 Zeilen -- EventEmitter-Klasse
+src/routes/ (11 Module)
+    - agents.js      Projekt-Steuerung (Start, Abort, Approve, Retry, Intervene, Resume)
+    - analytics.js   Metriken, Stats, Analytics, Suche
+    - config.js      Config, Prompts, Budget, Undo/Redo
+    - exports.js     ZIP, JSON, Markdown, PDF Export, Merge
+    - files.js       Dateibaum, Docs, I18n, Rollen, Retry-Strategien, Batch
+    - health.js      Health-Checks, Logs, Recovery
+    - projects.js    Projekte, Tags, Archive, Cleanup, Changelog, Diff
+    - queue.js       Queue, Meilensteine
+    - snapshots.js   Snapshots, Config-Profile
+    - templates.js   Templates, Managed Templates
+    - webhooks.js    Webhooks CRUD + Test
+    v
+src/ (10 Service-Module)
+    - api-docs.js, batch-processor.js, config-profiles.js, health-monitor.js
+    - i18n.js, log-search.js, logger.js, retry-strategies.js
+    - snapshot-manager.js, template-manager.js
+    v
+Orchestrator (orchestrator.js) ~4250 Zeilen -- EventEmitter-Klasse
     - Parallele Agent-Ausfuehrung (Semaphore, maxParallelAgents)
     - Dependency Graph (depends_on, Zyklen-Erkennung)
     - Auto-Retry bei Agent-Fehler (1x automatisch, 10s Wartezeit)
@@ -93,6 +112,16 @@ Dateisystem (projects/{id}/agent-{n}/)
 - **Syntax-Highlighting**: Prism.js fuer Code-Anzeige im File-Viewer (JS, TS, Python, JSON, CSS, Bash, Markdown).
 - **Desktop-Notifications**: Native Browser-Notifications bei Projekt-Abschluss, Agent-Fehler, Agent-Fragen.
 - **Server-Log-Viewer**: Integrierter Log-Viewer im Frontend mit Filterung, Paginierung und JSONL-Export (Taste 'l').
+- **Projekt-Archivierung**: Projekte archivieren/entarchivieren (POST /api/projects/:id/archive, /unarchive). Archivierte Projekte visuell abgedimmt.
+- **Projekt-Tags**: Tags pro Projekt zuweisen, filtern, entfernen. Tag-basierte Filterung in Historie. GET /api/tags fuer alle verwendeten Tags.
+- **Projekt-Favoriten**: Projekte als Favorit markieren (Frontend, localStorage). Stern-Icon + Sortierung.
+- **Projekt-Notizen**: Freitext-Notizen pro Projekt (Frontend, localStorage). Inline-Editor in Historie.
+- **Draft-Modus**: Projekt-Beschreibung und Einstellungen als Entwurf speichern/wiederherstellen (localStorage).
+- **PDF-Export**: Projekt als PDF exportieren (GET /api/export-pdf/:id).
+- **Toast-Benachrichtigungen**: Nicht-blockierende Toast-Meldungen im Frontend fuer Aktionen und Tastenkuerzel.
+- **Nicht-Stoeren-Modus**: Temporaerer DnD-Modus -- unterdrueckt Sound- und Desktop-Notifications.
+- **Clipboard-Kopieren**: Projekt-ID, Texte und Code-Bloecke per Klick kopieren (Clipboard API).
+- **Modulare Route-Architektur**: Server-Routen aufgeteilt in 11 Module unter src/routes/ (agents, analytics, config, exports, files, health, projects, queue, snapshots, templates, webhooks).
 
 ## API-Referenz
 
@@ -118,8 +147,11 @@ Dateisystem (projects/{id}/agent-{n}/)
 | Methode | Pfad | Beschreibung |
 |---|---|---|
 | GET | `/api/projects` | Alle Projekte auflisten (mit Score, Tokens, Phase) |
+| GET | `/api/tags` | Alle verwendeten Projekt-Tags |
 | GET | `/api/projects/:id` | Einzelnes Projekt laden (state.json) |
 | DELETE | `/api/projects/:id` | Einzelnes Projekt loeschen |
+| POST | `/api/projects/:id/archive` | Projekt archivieren |
+| POST | `/api/projects/:id/unarchive` | Projekt entarchivieren |
 | GET | `/api/projects/:id/changelog` | Chronologische Agent-Aktionen |
 | GET | `/api/projects/:id1/diff/:id2` | Zwei Projekte vergleichen (added/removed/changed) |
 
@@ -139,6 +171,7 @@ Dateisystem (projects/{id}/agent-{n}/)
 | GET | `/api/export/:id` | Projekt als ZIP herunterladen (zlib level 9) |
 | GET | `/api/export-json/:id` | Projekt als JSON mit Conversations |
 | GET | `/api/export-markdown/:id` | Projekt als Markdown-Bericht |
+| GET | `/api/export-pdf/:id` | Projekt als PDF-Bericht |
 | GET | `/api/merged/:id` | Zusammengefuehrte Dateien + Merge-Report + Konflikte |
 | POST | `/api/merge/:id` | Manuelles Re-Merge triggern (Strategie waehlbar) |
 
@@ -347,7 +380,7 @@ Dateisystem (projects/{id}/agent-{n}/)
 | GET `/api/stream` | SSE-Endpoint (Auto-Reconnect via Last-Event-ID, max 50 Clients, 5 pro IP) |
 | `/ws` | WebSocket-Endpoint (Upgrade-Handler, Heartbeat, Event-Subscription) |
 
-**Gesamt: 131 Endpoints** (129 REST + SSE + WebSocket)
+**Gesamt: 125 Endpoints** (123 REST + SSE + WebSocket)
 
 ## SSE-Events
 
@@ -501,9 +534,21 @@ Wenn `_subscribedEvents` gesetzt ist, werden nur abonnierte Events gesendet.
 
 ```
 Multiagents/
-├── server.js              Express Server, SSE, WebSocket, REST API, Security, Webhooks (~4060 Zeilen)
-├── orchestrator.js        Orchestrator-Klasse, parallele Ausfuehrung, Merge, Recovery (~4240 Zeilen)
+├── server.js              Express Server, SSE, WebSocket, Middleware, Metriken (~2455 Zeilen)
+├── orchestrator.js        Orchestrator-Klasse, parallele Ausfuehrung, Merge, Recovery (~4250 Zeilen)
 ├── src/
+│   ├── routes/            Modulare API-Route-Handler (~3640 Zeilen gesamt)
+│   │   ├── agents.js      Projekt-Steuerung (Start, Abort, Approve, Retry, Intervene, Resume)
+│   │   ├── analytics.js   Metriken, Stats, Analytics, Suche
+│   │   ├── config.js      Config, Prompts, Budget, Undo/Redo
+│   │   ├── exports.js     ZIP, JSON, Markdown, PDF Export, Merge
+│   │   ├── files.js       Dateibaum, Docs, I18n, Rollen, Retry-Strategien, Batch
+│   │   ├── health.js      Health-Checks, Logs, Recovery
+│   │   ├── projects.js    Projekte, Tags, Archive, Cleanup, Changelog, Diff
+│   │   ├── queue.js       Queue, Meilensteine
+│   │   ├── snapshots.js   Snapshots, Config-Profile
+│   │   ├── templates.js   Templates, Managed Templates
+│   │   └── webhooks.js    Webhooks CRUD + Test
 │   ├── logger.js          Winston Logger + BufferTransport + Log-Rotation
 │   ├── api-docs.js        Auto-generierte API-Dokumentation (JSON, OpenAPI, Markdown, Swagger UI)
 │   ├── batch-processor.js Batch-Request-Verarbeitung
@@ -515,7 +560,7 @@ Multiagents/
 │   ├── snapshot-manager.js Snapshot-Verwaltung (CRUD, Vergleich, Restore)
 │   └── template-manager.js Erweiterte Template-Verwaltung (Rating, Duplikation)
 ├── public/
-│   └── index.html         GUI (Vanilla JS, Dark/Light, WebSocket/SSE, 3 Ansichten, ~12740 Zeilen)
+│   └── index.html         GUI (Vanilla JS, Dark/Light, WebSocket/SSE, 3 Ansichten, ~13600 Zeilen)
 ├── projects/              Agent-Outputs + state.json + Checkpoints (auto-erstellt)
 ├── profiles/              Config-Profile (JSON, auto-erstellt)
 ├── snapshots/             Projekt-Snapshots (JSON, auto-erstellt)
@@ -524,8 +569,8 @@ Multiagents/
 ├── screenshots/           Screenshots (auto-erstellt)
 ├── __tests__/
 │   ├── unit/              31 Test-Dateien
-│   ├── api/               54 API-Test-Dateien
-│   ├── e2e/               3 E2E-Test-Dateien (Smoke, Keyboard, Queue)
+│   ├── api/               58 API-Test-Dateien
+│   ├── e2e/               24 E2E-Test-Dateien
 │   └── integration/       1 Orchestrator E2E Test
 ├── .env.example           Konfigurationsvorlage
 ├── hooks.example.js       Hook-System Beispiel
@@ -535,23 +580,25 @@ Multiagents/
 ├── prompts.default.json   Standard-Prompt-Templates
 ├── webhooks.json          Registrierte Webhooks (auto-erstellt)
 ├── webhook-test.js        Webhook-Test-Script
+├── pw-debug.js            Playwright Debug-Helfer
 ├── jest.config.js         Jest-Konfiguration (maxWorkers:1)
 ├── Dockerfile             Docker-Container
 ├── docker-compose.yml     Docker Compose
 ├── package.json           v4.1.0
 ├── start.bat              Windows-Starter
 ├── README.md              Projekt-README
+├── GUIDE.md               Benutzerhandbuch
 ├── ROADMAP.md             Feature-Roadmap
 └── CLAUDE.md              Diese Datei
 ```
 
 ## Tests
 
-89 Test-Suites (`npm test`):
+114 Test-Suites (`npm test`):
 
 - **Unit** (31): API-Docs, Backoff, Batch-Processor, Config, Config-Profiles, Config-Validation, Delta-Writes, Dependency, Dependency-Graph, Format-Detection, Health-Monitor, Hooks, I18n, Intervention, Intervention-Types, JSON-Parsing, Load-Project, Log-Search, Progress, Rate-Limit, Resume, Retry-Strategies, Scoring, Semaphore, Shared-Context, Snapshot-Manager, State-Persistence, Template-Manager, Timing, Token-Tracking, Webhook
-- **API** (54): Abort-Resume, Agent-Prompts, Analytics, Auth, Batch, Batch-Ops, Benchmark, Budget, Changelog, Config, Config-CRUD, Disk-Cleanup, Docs, Export, Export-Formats, File-Browser, File-Content, Health, Health-Alerts, Health-Detailed, I18n-Strategies, Intervention, Logs, Merge, Metrics, Milestones, Milestones-CRUD, Performance, Profiles, Profiles-CRUD, Project-Lifecycle, Projects, Prompts, Queue, Queue-Priority, Recovery, Reorder, Roles, Search, Search-Advanced, Search-Full, Security, Server, Snapshots, Snapshots-CRUD, SSE-Stream, Start-Reset, Stats, Templates, Templates-CRUD, Templates-Managed, Undo-Redo, Webhooks, Webhooks-CRUD
-- **E2E** (3): Smoke, Keyboard, Queue
+- **API** (58): Abort-Resume, Agent-Prompts, Analytics, Archive, Auth, Batch, Batch-Ops, Benchmark, Budget, Changelog, Config, Config-CRUD, Disk-Cleanup, Docs, Export, Export-Formats, Export-PDF, File-Browser, File-Content, Health, Health-Alerts, Health-Detailed, I18n-Strategies, Intervention, Logs, Merge, Metrics, Milestones, Milestones-CRUD, Performance, Profiles, Profiles-CRUD, Project-Lifecycle, Projects, Prompts, Queue, Queue-Priority, Rate-Limiting, Recovery, Reorder, Roles, Search, Search-Advanced, Search-Full, Security, Server, Snapshots, Snapshots-CRUD, SSE-Stream, Start-Reset, Stats, Tags, Templates, Templates-CRUD, Templates-Managed, Undo-Redo, Webhooks, Webhooks-CRUD
+- **E2E** (24): Accessibility, Analytics, Clipboard, Connection, Cost-Banner, Draft, Favorites, File-Viewer, History, Integration, Keyboard, Mobile, Notes, Onboarding, Project-Flow, Queue, Search-Highlight, Settings, Smoke, Theme, Toasts, Token-Panel, Webhooks-UI, Workspace
 - **Integration** (1): Orchestrator E2E
 
 Jeder API-Test nutzt einen eigenen Port (3196+) um Konflikte zu vermeiden.
@@ -638,7 +685,7 @@ Die Konfiguration erfolgt ueber Umgebungsvariablen in `docker-compose.yml` oder 
 npm install            # einmalig
 node server.js         # dann http://localhost:3131 oeffnen
 npm run dev            # mit Auto-Reload (--watch)
-npm test               # 89 Test-Suites
+npm test               # 114 Test-Suites
 ```
 
 Oder: `start.bat` doppelklicken (Windows)
@@ -702,8 +749,10 @@ Oder: `start.bat` doppelklicken (Windows)
 - Webhook-Dispatching mit HMAC-SHA256 Signatur und Retry
 - Project Queue mit Auto-Dequeue, Prioritaeten und exponential Backoff bei Fehlern
 - Durchschnittliche Projektdauer-Tracking fuer geschaetzte Wartezeiten
+- Modulare Route-Handler in `src/routes/` (11 Module): agents, analytics, config, exports, files, health, projects, queue, snapshots, templates, webhooks
 - Modulare Service-Layer in `src/`: API-Docs, Batch-Processor, Config-Profiles, Health-Monitor, I18n, Log-Search, Retry-Strategies, Snapshot-Manager, Template-Manager
 - Rollen-Management (CRUD) mit Persistierung in roles.json
+- Projekt-Archivierung und Tags
 - Undo/Redo fuer Config- und Plan-Aenderungen
 - Swagger UI Integration unter /api/docs/ui/
 
@@ -722,7 +771,16 @@ Oder: `start.bat` doppelklicken (Windows)
 - `openLogViewer()` -- Server-Log-Viewer mit Filterung und Paginierung
 - `getPrismLanguage()` -- Syntax-Highlighting Sprach-Erkennung fuer File-Viewer
 - `showNotification()` -- Desktop-Notifications (Browser Notification API)
+- `showToast()` -- Toast-Benachrichtigungen (nicht-blockierend, mit Typen)
 - `updateRetryStrategyHint()` -- Retry-Strategie-Beschreibung in Einstellungen
+- `saveDraft()` / `restoreDraft()` / `clearDraft()` -- Entwurf-Speicherung (localStorage)
+- `archiveProject()` / `unarchiveProject()` -- Projekt-Archivierung
+- `toggleFavorite()` / `isFavorite()` -- Projekt-Favoriten (localStorage)
+- `addProjectTag()` / `removeProjectTag()` -- Projekt-Tags (localStorage)
+- `getProjectNote()` / `saveProjectNote()` / `toggleNoteEditor()` -- Projekt-Notizen
+- `copyToClipboard()` -- Clipboard-Kopieren mit Toast-Feedback
+- `undoConfig()` / `redoConfig()` / `undoPlan()` / `redoPlan()` -- Undo/Redo
+- `toggleDoNotDisturb()` -- Nicht-Stoeren-Modus
 - Sound-Benachrichtigungen (Web Audio API) + Desktop Notifications
 
 ## Frontend-Features
@@ -739,11 +797,19 @@ Oder: `start.bat` doppelklicken (Windows)
 - **Conversation Inspector** (Tabs: Verlauf, Prompts, Dateien)
 - **Projekt-Vergleich** (2 Projekte nebeneinander)
 - **Bulk-Operationen** (Mehrfach-Auswahl, Loeschen, Export)
-- **Export**: ZIP, JSON, Markdown
+- **Export**: ZIP, JSON, Markdown, PDF
 - **Syntax-Highlighting** (Prism.js): JS, TS, Python, JSON, CSS, Bash, Markdown, HTML im File-Viewer
 - **Retry-Strategy UI**: Strategie-Auswahl in Einstellungen mit Beschreibung
 - **Sound-Benachrichtigungen** (Web Audio API)
 - **Desktop-Notifications**: Native Browser-Notifications (Projekt fertig, Agent-Fehler, Agent-Fragen)
+- **Toast-Benachrichtigungen**: Nicht-blockierende Meldungen fuer Aktionen, Tastenkuerzel, Fehler
+- **Nicht-Stoeren-Modus**: Temporaerer DnD-Modus unterdrueckt Sound und Desktop-Notifications
+- **Projekt-Archivierung**: Archivieren/Entarchivieren mit visueller Abdimmung und Filter
+- **Projekt-Tags**: Farbige Tags pro Projekt, Tag-basierte Filterung in Historie
+- **Projekt-Favoriten**: Stern-Markierung mit Sortierung (localStorage)
+- **Projekt-Notizen**: Inline-Editor fuer Freitext-Notizen pro Projekt (localStorage)
+- **Draft-Modus**: Entwurf speichern/wiederherstellen fuer Projekt-Setup (localStorage)
+- **Clipboard-Kopieren**: Projekt-ID und Code-Bloecke per Klick kopieren
 - **Druckansicht** (`@media print`)
 - **Mobile Responsive + Accessibility** (ARIA-Attribute, Media Queries)
 
