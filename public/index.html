@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Multi-Agent Orchestrator</title>
+<style>
+  :root {
+    --bg: #ffffff; --bg2: #f5f5f3; --bg3: #eeecea;
+    --txt: #1a1a18; --txt2: #6b6b68; --txt3: #999994;
+    --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+    --radius: 12px; --radius-sm: 8px;
+    --blue-bg: #e6f1fb; --blue: #185FA5; --blue-dark: #0C447C;
+    --teal-bg: #e1f5ee; --teal: #0F6E56;
+    --amber-bg: #faeeda; --amber: #854F0B; --amber-dark: #633806;
+    --red-bg: #fcebeb; --red: #A32D2D;
+    --gray-bg: #f1efe8; --gray: #5F5E5A;
+    --purple-bg: #eeedfe; --purple: #534AB7;
+    --green: #1D9E75;
+    --font: -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'Cascadia Code', 'Consolas', monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --bg2: #252523; --bg3: #2e2e2b;
+      --txt: #e8e8e4; --txt2: #9a9a96; --txt3: #6b6b68;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+      --blue-bg: #0c447c; --blue: #85b7eb; --blue-dark: #b5d4f4;
+      --teal-bg: #085041; --teal: #9FE1CB;
+      --amber-bg: #633806; --amber: #FAC775; --amber-dark: #FAEEDA;
+      --red-bg: #791f1f; --red: #f7c1c1;
+      --gray-bg: #444441; --gray: #B4B2A9;
+      --purple-bg: #3c3489; --purple: #AFA9EC;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--txt); font-size: 14px; line-height: 1.5; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .spin { animation: spin 0.7s linear infinite; }
+  .fadein { animation: fadein 0.2s ease; }
+
+  /* Layout */
+  #app { max-width: 1000px; margin: 0 auto; padding: 2rem 1.5rem; }
+  .stack { display: flex; flex-direction: column; gap: 1rem; }
+  .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; }
+  .card-sm { padding: 1rem; }
+  .section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--txt3); margin-bottom: 8px; }
+
+  /* Badge */
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 99px; }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .badge .spinner { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid transparent; }
+
+  /* Progress bar */
+  .pbar-wrap { height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .pbar-fill { height: 100%; border-radius: 3px; background: var(--txt); transition: width 0.5s ease; }
+
+  /* Setup form */
+  .setup-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .setup-sub { color: var(--txt2); margin-bottom: 1.75rem; font-size: 13px; line-height: 1.6; }
+  label { font-size: 13px; color: var(--txt2); display: block; margin-bottom: 6px; }
+  textarea, input[type=range] { width: 100%; }
+  textarea { min-height: 110px; resize: vertical; padding: 10px 12px;
+    background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--txt); font-family: var(--font); font-size: 14px; }
+  textarea:focus { outline: none; border-color: var(--border2); }
+  input[type=range] { accent-color: var(--txt); }
+  .field { margin-bottom: 1.25rem; }
+  .row { display: flex; gap: 12px; align-items: flex-end; }
+  .count-box { flex: 0 0 170px; }
+  .count-num { font-size: 26px; font-weight: 600; text-align: center; margin-bottom: 6px; }
+
+  /* Buttons */
+  .btn-primary { flex: 1; padding: 11px 24px; background: var(--txt); color: var(--bg);
+    border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: opacity 0.15s; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-outline { padding: 7px 16px; background: transparent; border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; color: var(--txt2);
+    transition: background 0.15s; }
+  .btn-outline:hover { background: var(--bg2); }
+
+  /* Header */
+  .proj-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+  .proj-title { font-size: 18px; font-weight: 600; }
+  .proj-summary { font-size: 13px; color: var(--txt2); margin-top: 4px; line-height: 1.5; }
+  .proj-path { font-size: 11px; color: var(--txt3); font-family: var(--mono); margin-top: 4px; }
+  .stats-row { display: flex; align-items: center; gap: 10px; flex-shrink: 0; text-align: right; }
+  .stat-label { font-size: 12px; color: var(--txt2); margin-bottom: 5px; }
+
+  /* Coordinator */
+  .coord-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .coord-name { font-size: 14px; font-weight: 600; }
+  .coord-summary { font-size: 13px; color: var(--txt2); line-height: 1.6; }
+  .active-q { background: var(--amber-bg); border: 0.5px solid var(--amber); border-radius: var(--radius-sm); padding: 8px 12px; margin-top: 10px; font-size: 12px; color: var(--amber-dark); }
+  .active-q-label { font-weight: 600; margin-bottom: 3px; }
+  .proto-item { background: var(--bg2); border-radius: var(--radius-sm); padding: 7px 10px; }
+  .proto-q { color: var(--txt2); margin-bottom: 3px; font-size: 11.5px; }
+  .proto-a { color: var(--txt); font-size: 11px; }
+  .proto-scroll { max-height: 130px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+
+  /* Agent grid */
+  .agent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+  .agent-card { background: var(--bg); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 1rem; display: flex; flex-direction: column;
+    gap: 8px; transition: border-color 0.3s; }
+  .agent-num { font-size: 11px; color: var(--txt2); font-weight: 500; }
+  .agent-title { font-size: 13px; font-weight: 600; margin-top: 1px; }
+  .agent-task { font-size: 11.5px; color: var(--txt2); line-height: 1.5;
+    border-left: 2px solid var(--border); padding-left: 8px; }
+  .agent-conv { background: var(--bg2); border-radius: var(--radius-sm); padding: 8px;
+    min-height: 70px; max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+  .agent-foot { font-size: 11px; color: var(--txt3); }
+
+  /* Chat bubbles */
+  .bubble-wrap { display: flex; }
+  .bubble-wrap.right { justify-content: flex-end; }
+  .bubble { max-width: 90%; border-radius: 8px; padding: 5px 9px; font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .bubble-label { font-size: 10px; opacity: 0.65; margin-bottom: 2px; }
+  .bubble-agent { background: var(--bg3); color: var(--txt2); }
+  .bubble-question { background: var(--amber-bg); color: var(--amber-dark); }
+  .bubble-coordinator { background: var(--blue-bg); color: var(--blue-dark); }
+  .bubble-empty { font-size: 11.5px; color: var(--txt3); font-style: italic; }
+
+  /* Complete banner */
+  .complete-banner { background: var(--teal-bg); border: 0.5px solid var(--green);
+    border-radius: var(--radius); padding: 1rem 1.5rem;
+    display: flex; align-items: center; gap: 12px; }
+  .complete-title { font-size: 14px; font-weight: 600; color: var(--teal); }
+  .complete-sub { font-size: 12px; color: var(--teal); opacity: 0.8; margin-top: 2px; }
+  .complete-path { font-size: 11px; font-family: var(--mono); color: var(--teal); opacity: 0.7; margin-top: 4px; }
+
+  /* Connection status */
+  .conn-bar { position: fixed; top: 0; left: 0; right: 0; padding: 6px 16px;
+    font-size: 12px; text-align: center; z-index: 100; display: none; }
+  .conn-bar.offline { display: block; background: var(--red-bg); color: var(--red); }
+</style>
+</head>
+<body>
+<div class="conn-bar" id="connBar">Verbindung zum Server unterbrochen – läuft server.js?</div>
+<div id="app"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────
+let state = {
+  phase: 'setup',
+  projectTitle: '', projectSummary: '', projectDir: '',
+  coordinator: { status: 'idle', summary: '', activeQuestion: null, log: [] },
+  agents: []
+};
+let busy = false;
+
+// ── SSE Connection ────────────────────────────────────────────
+let es;
+function connect() {
+  if (es) es.close();
+  es = new EventSource('/api/stream');
+
+  es.addEventListener('state', e => { applyState(JSON.parse(e.data)); render(); });
+  es.addEventListener('phase', e => { state.phase = JSON.parse(e.data).phase; render(); });
+  es.addEventListener('coordinator', e => { state.coordinator = JSON.parse(e.data); render(); });
+  es.addEventListener('project_meta', e => {
+    const d = JSON.parse(e.data);
+    state.projectTitle = d.title;
+    state.projectSummary = d.summary;
+    state.projectDir = d.dir;
+    render();
+  });
+  es.addEventListener('agent', e => {
+    const { index, agent } = JSON.parse(e.data);
+    if (state.agents[index]) state.agents[index] = { ...state.agents[index], ...agent };
+    render();
+  });
+  es.addEventListener('agent_msg', e => {
+    const { index, msg } = JSON.parse(e.data);
+    if (state.agents[index]) state.agents[index].conversation.push(msg);
+    render();
+  });
+  es.addEventListener('error', e => {
+    if (e.data) { const d = JSON.parse(e.data); console.error(d.message); }
+    document.getElementById('connBar').classList.toggle('offline', es.readyState === EventSource.CLOSED);
+  });
+  es.onopen = () => document.getElementById('connBar').classList.remove('offline');
+  es.onerror = () => { if (es.readyState === EventSource.CLOSED) connect(); };
+}
+
+function applyState(s) {
+  state.phase = s.phase || 'idle';
+  state.coordinator = s.coordinator || state.coordinator;
+  state.agents = s.agents || [];
+  state.projectTitle = s.projectTitle || '';
+  state.projectSummary = s.projectSummary || '';
+}
+
+// ── Badge helper ──────────────────────────────────────────────
+const BADGE_MAP = {
+  idle:     ['Bereit',    '#F1EFE8','#5F5E5A', false],
+  planning: ['Plant…',   '#EEEDFE','#534AB7', true],
+  ready:    ['Bereit',   '#E1F5EE','#0F6E56', false],
+  thinking: ['Denkt…',  '#EEEDFE','#534AB7', true],
+  waiting:  ['Wartend',  '#F1EFE8','#888780', false],
+  working:  ['Arbeitet', '#E6F1FB','#185FA5', true],
+  asking:   ['Fragt…',   '#FAEEDA','#854F0B', true],
+  done:     ['Fertig',   '#E1F5EE','#0F6E56', false],
+  error:    ['Fehler',   '#FCEBEB','#A32D2D', false],
+  complete: ['Fertig',   '#E1F5EE','#0F6E56', false],
+};
+
+function badge(s) {
+  const [label, bg, color, spin] = BADGE_MAP[s] || BADGE_MAP.idle;
+  const indicator = spin
+    ? `<span class="spinner spin" style="border:1.5px solid ${color}33;border-top-color:${color}"></span>`
+    : `<span class="dot" style="background:${color}"></span>`;
+  return `<span class="badge" style="background:${bg};color:${color}">${indicator}${label}</span>`;
+}
+
+function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '…' : (s || ''); }
+
+// ── Render ────────────────────────────────────────────────────
+function render() {
+  const app = document.getElementById('app');
+  if (state.phase === 'setup' || state.phase === 'idle') {
+    app.innerHTML = renderSetup();
+  } else {
+    app.innerHTML = renderDashboard();
+  }
+  // Scroll agent convos to bottom
+  document.querySelectorAll('.agent-conv').forEach(el => { el.scrollTop = el.scrollHeight; });
+}
+
+function renderSetup() {
+  return `
+<div class="card" style="max-width:640px;margin:3rem auto">
+  <div class="setup-title">Agent Orchestrator</div>
+  <div class="setup-sub">Der Koordinator plant das Projekt und weist Claude Code Agenten Aufgaben zu.<br>
+    Agenten können Rückfragen stellen – der Koordinator antwortet. Alle Outputs landen als echte Dateien auf deiner Festplatte.</div>
+  <div class="field">
+    <label>Projektbeschreibung</label>
+    <textarea id="desc" placeholder="z.B. Erstelle eine vollständige REST API für einen Online-Shop mit Produkten, Bestellungen und Nutzerverwaltung. Nutze Node.js, TypeScript und PostgreSQL."></textarea>
+  </div>
+  <div class="row">
+    <div class="count-box">
+      <label>Anzahl Agenten</label>
+      <div class="count-num" id="countDisplay">3</div>
+      <input type="range" id="countSlider" min="2" max="5" step="1" value="3"
+        oninput="document.getElementById('countDisplay').textContent=this.value">
+    </div>
+    <button class="btn-primary" id="startBtn" onclick="startProject()">
+      Projekt starten
+    </button>
+  </div>
+</div>`;
+}
+
+function renderDashboard() {
+  const agents = state.agents || [];
+  const coord = state.coordinator || {};
+  const done = agents.filter(a => a.status === 'done').length;
+  const total = agents.length;
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  const totalQ = (coord.log || []).length;
+  const isComplete = state.phase === 'complete';
+
+  return `
+<div class="stack" style="padding-top:0.5rem">
+  ${isComplete ? `
+  <div class="complete-banner fadein">
+    <div style="flex:1">
+      <div class="complete-title">✓ Alle ${total} Agenten abgeschlossen</div>
+      <div class="complete-sub">${totalQ > 0 ? `${totalQ} Rückfrage${totalQ !== 1 ? 'n' : ''} beantwortet` : 'Keine Rückfragen nötig'}</div>
+      ${state.projectDir ? `<div class="complete-path">${state.projectDir}</div>` : ''}
+    </div>
+    <button class="btn-outline" onclick="resetProject()">Neues Projekt</button>
+  </div>` : ''}
+
+  <div class="card">
+    <div class="proj-header">
+      <div>
+        <div class="proj-title">${state.projectTitle || 'Projekt läuft…'}</div>
+        ${state.projectSummary ? `<div class="proj-summary">${state.projectSummary}</div>` : ''}
+        ${state.projectDir ? `<div class="proj-path">${state.projectDir}</div>` : ''}
+      </div>
+      <div class="stats-row">
+        ${isComplete
+          ? `<button class="btn-outline" onclick="resetProject()">Neues Projekt</button>`
+          : `<div>
+              <div class="stat-label">${done} / ${total} · ${totalQ} Dialoge</div>
+              <div class="pbar-wrap" style="width:150px">
+                <div class="pbar-fill" style="width:${pct}%"></div>
+              </div>
+            </div>`}
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-label">Koordinator</div>
+    ${renderCoordinator(coord)}
+  </div>
+
+  ${agents.length > 0 ? `
+  <div>
+    <div class="section-label">Agenten (${total})</div>
+    <div class="agent-grid">${agents.map((a, i) => renderAgent(a, i)).join('')}</div>
+  </div>` : ''}
+</div>`;
+}
+
+function renderCoordinator(c) {
+  const log = c.log || [];
+  return `
+<div class="card card-sm">
+  <div class="coord-header">
+    <div class="coord-name">Koordinator</div>
+    ${badge(c.status || 'idle')}
+  </div>
+  ${c.summary ? `<div class="coord-summary">${c.summary}</div>` : ''}
+  ${c.activeQuestion ? `
+  <div class="active-q">
+    <div class="active-q-label">Beantwortet Frage von Agent ${c.activeQuestion.agentIndex + 1}:</div>
+    ${truncate(c.activeQuestion.question, 120)}
+  </div>` : ''}
+  ${log.length > 0 ? `
+  <div style="margin-top:10px">
+    <div class="section-label">Dialog-Protokoll</div>
+    <div class="proto-scroll">
+      ${[...log].reverse().map(e => `
+      <div class="proto-item">
+        <div class="proto-q">Agent ${e.agentIndex + 1} fragte: ${truncate(e.question, 80)}</div>
+        <div class="proto-a">${truncate(e.answer, 110)}</div>
+      </div>`).join('')}
+    </div>
+  </div>` : ''}
+</div>`;
+}
+
+function renderAgent(agent, idx) {
+  const bc = {working:'#85B7EB',asking:'#EF9F27',done:'#5DCAA5',error:'#F09595'}[agent.status] || 'var(--border)';
+  const conv = agent.conversation || [];
+  const bubbles = conv.length === 0
+    ? `<div class="bubble-empty">${agent.status === 'waiting' ? 'Wartet auf Zuweisung…' : 'Startet…'}</div>`
+    : conv.map(m => {
+        if (m.from === 'coordinator') {
+          return `<div class="bubble-wrap right"><div class="bubble bubble-coordinator"><div class="bubble-label">Koordinator →</div>${truncate(m.text, 300)}</div></div>`;
+        } else if (m.type === 'question') {
+          return `<div class="bubble-wrap"><div class="bubble bubble-question"><div class="bubble-label">Frage →</div>${truncate(m.text, 200)}</div></div>`;
+        } else {
+          return `<div class="bubble-wrap"><div class="bubble bubble-agent">${truncate(m.text, 300)}</div></div>`;
+        }
+      }).join('');
+
+  return `
+<div class="agent-card" style="border-color:${bc}">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div>
+      <div class="agent-num">Agent ${idx + 1}</div>
+      <div class="agent-title">${agent.title || '—'}</div>
+    </div>
+    ${badge(agent.status || 'waiting')}
+  </div>
+  ${agent.task ? `<div class="agent-task">${truncate(agent.task, 90)}</div>` : ''}
+  <div class="agent-conv">${bubbles}</div>
+  <div class="agent-foot">${agent.rounds || 0} Runden · ${agent.questions || 0} Fragen</div>
+</div>`;
+}
+
+// ── Actions ───────────────────────────────────────────────────
+async function startProject() {
+  const desc = document.getElementById('desc')?.value?.trim();
+  const count = parseInt(document.getElementById('countSlider')?.value || '3');
+  if (!desc || busy) return;
+  busy = true;
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('startBtn').textContent = 'Startet…';
+
+  try {
+    state.phase = 'running';
+    state.projectTitle = '';
+    state.projectSummary = '';
+    state.coordinator = { status: 'planning', summary: '', activeQuestion: null, log: [] };
+    state.agents = Array.from({ length: count }, (_, i) => ({
+      id: i, title: 'Wird geplant…', task: '', deliverable: '',
+      status: 'waiting', conversation: [], rounds: 0, questions: 0
+    }));
+    render();
+
+    await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: desc, agentCount: count })
+    });
+  } catch (e) {
+    alert('Fehler: ' + e.message);
+    state.phase = 'setup';
+    render();
+  } finally {
+    busy = false;
+  }
+}
+
+async function resetProject() {
+  await fetch('/api/reset', { method: 'POST' });
+  state = { phase: 'setup', projectTitle: '', projectSummary: '', projectDir: '',
+    coordinator: { status: 'idle', summary: '', activeQuestion: null, log: [] }, agents: [] };
+  render();
+}
+
+// ── Init ──────────────────────────────────────────────────────
+connect();
+render();
+</script>
+</body>
+</html>
