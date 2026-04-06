@@ -19,7 +19,7 @@ const CONFIG = {
   baseDelay: parseInt(process.env.RETRY_BASE_DELAY) || 5000,
   maxAgents: parseInt(process.env.MAX_AGENTS) || 10,
   concurrency: parseInt(process.env.AGENT_CONCURRENCY) || 3,
-  maxRounds: 5,
+  maxRounds: parseInt(process.env.MAX_ROUNDS) || 5,
   autoRetry: process.env.AUTO_RETRY !== 'false',
 };
 

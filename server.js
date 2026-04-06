@@ -544,7 +544,7 @@ app.post('/api/clone/:id', apiLimiter, (req, res) => {
 const server = app.listen(PORT, () => {
   console.log('');
   console.log('  ╔═══════════════════════════════════════╗');
-  console.log('  ║   Claude Multi-Agent Orchestrator v2  ║');
+  console.log('  ║   Claude Multi-Agent Orchestrator v3  ║');
   console.log('  ╚═══════════════════════════════════════╝');
   console.log('');
   console.log(`  Server:   http://localhost:${PORT}`);

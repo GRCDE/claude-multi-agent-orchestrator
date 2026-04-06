@@ -1,9 +1,12 @@
 {
   "name": "claude-multiagents",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Multi-Agent Orchestrator powered by Claude Code CLI",
   "main": "server.js",
   "type": "commonjs",
+  "keywords": ["multi-agent", "claude", "orchestrator", "ai", "automation"],
+  "author": "choda",
+  "license": "MIT",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
