@@ -133,6 +133,7 @@
   .agent-card.asking  { border-color: #EF9F27; box-shadow: 0 0 0 1px #EF9F2733; }
   .agent-card.done    { border-color: #5DCAA5; }
   .agent-card.error   { border-color: #F09595; box-shadow: 0 0 0 1px #F0959533; }
+  .agent-card.retrying { border-color: #EF9F27; box-shadow: 0 0 0 1px #EF9F2733; }
   .agent-num { font-size: 11px; color: var(--txt2); font-weight: 500; }
   .agent-role { font-size: 10px; color: var(--txt3); background: var(--bg2); border-radius: 4px; padding: 1px 6px; display: inline-block; margin-top: 2px; }
   .agent-title { font-size: 13px; font-weight: 600; margin-top: 1px; }
@@ -176,6 +177,15 @@
   .complete-title { font-size: 14px; font-weight: 600; color: var(--teal); }
   .complete-sub { font-size: 12px; color: var(--teal); opacity: 0.8; margin-top: 2px; }
   .complete-path { font-size: 11px; font-family: var(--mono); color: var(--teal); opacity: 0.7; margin-top: 4px; }
+
+  /* ── Partial banner ─────────────────────────────────────── */
+  .partial-banner { background: var(--amber-bg); border: 0.5px solid var(--amber);
+    border-radius: var(--radius); padding: 1rem 1.5rem;
+    display: flex; align-items: center; gap: 12px; }
+  .partial-title { font-size: 14px; font-weight: 600; color: var(--amber-dark); }
+  .partial-sub { font-size: 12px; color: var(--amber-dark); opacity: 0.8; margin-top: 2px; }
+  .partial-path { font-size: 11px; font-family: var(--mono); color: var(--amber-dark); opacity: 0.7; margin-top: 4px; }
+  .partial-retry-btns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 
   /* ── Connection bar ────────────────────────────────────── */
   .conn-bar { position: fixed; top: 0; left: 0; right: 0; padding: 6px 16px;
@@ -303,6 +313,26 @@
   .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
   .file-size { flex-shrink: 0; font-size: 10px; color: var(--txt3); font-family: var(--mono); }
   .file-tree-empty { font-size: 11.5px; color: var(--txt3); font-style: italic; padding: 4px 0; }
+  .file-item-clickable { cursor: pointer; }
+  .file-item-clickable:hover { background: var(--bg3); }
+
+  /* ── File content modal ─────────────────────────────── */
+  .file-modal { max-width: 820px; width: 95%; max-height: 85vh; display: flex; flex-direction: column; }
+  .file-modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 1rem; padding-right: 2rem; }
+  .file-modal-info { flex: 1; min-width: 0; }
+  .file-modal-path { font-family: var(--mono); font-size: 13px; font-weight: 600; word-break: break-all; }
+  .file-modal-size { font-size: 11px; color: var(--txt3); margin-top: 2px; }
+  .file-modal-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: flex-start; }
+  .file-modal-copy { padding: 5px 12px; background: var(--bg2); border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; color: var(--txt2);
+    transition: background var(--transition), color var(--transition); }
+  .file-modal-copy:hover { background: var(--bg3); color: var(--txt); }
+  .file-modal-body { flex: 1; overflow: auto; background: var(--bg2); border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 1rem; }
+  .file-modal-body pre { margin: 0; white-space: pre-wrap; word-break: break-word;
+    font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--txt); }
+  .file-modal-binary { display: flex; align-items: center; justify-content: center;
+    min-height: 120px; color: var(--txt3); font-size: 14px; }
 
   /* ── Approval screen ─────────────────────────────────── */
   .approval-box { max-width: 720px; margin: 2rem auto; }
@@ -333,6 +363,38 @@
   .settings-status { font-size: 12px; margin-top: 8px; min-height: 18px; }
   .settings-status.ok { color: var(--green); }
   .settings-status.err { color: var(--red); }
+
+  /* ── Filter bar ───────────────────────────────────────── */
+  .filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .filter-input { padding: 6px 10px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); color: var(--txt); font-size: 13px; flex: 1; min-width: 200px; font-family: var(--font); }
+  .filter-input:focus { outline: none; border-color: var(--border2); box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+  .filter-btn { padding: 5px 12px; font-size: 12px; border-radius: 99px; border: 0.5px solid var(--border); background: var(--bg2); color: var(--txt2); cursor: pointer; transition: all var(--transition); }
+  .filter-btn:hover { background: var(--bg3); }
+  .filter-btn.active { background: var(--blue-bg); color: var(--blue); border-color: var(--blue); }
+  .filter-count { font-size: 11px; color: var(--txt3); white-space: nowrap; }
+  .modal-search { margin-bottom: 12px; display: flex; gap: 8px; align-items: center; }
+  .modal-search-input { flex: 1; padding: 6px 10px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); color: var(--txt); font-size: 13px; font-family: var(--font); }
+  .modal-search-input:focus { outline: none; border-color: var(--border2); box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+  .modal-search-count { font-size: 11px; color: var(--txt3); white-space: nowrap; }
+  mark { background: var(--amber-bg); color: var(--amber-dark); border-radius: 2px; padding: 0 1px; }
+
+
+  /* -- Shortcuts modal ------------------------------ */
+  .shortcuts-grid {
+    display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; align-items: center;
+  }
+  .shortcuts-grid kbd {
+    display: inline-block; background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 4px; padding: 2px 8px; font-family: var(--mono); font-size: 12px;
+    font-weight: 600; color: var(--txt); min-width: 28px; text-align: center;
+    box-shadow: 0 1px 0 var(--border);
+  }
+  .shortcuts-grid .shortcut-desc {
+    font-size: 13px; color: var(--txt2);
+  }
+  .shortcuts-hint {
+    font-size: 11px; color: var(--txt3); text-align: center; margin-top: 12px;
+  }
 
   /* ── Mobile responsive ─────────────────────────────────── */
   @media (max-width: 768px) {
@@ -382,6 +444,8 @@ let projectHistory = [];
 let templates = [];
 let selectedTemplateId = null;
 let allDetailsExpanded = false;
+let agentFilter = 'alle'; // 'alle' | 'aktiv' | 'fertig' | 'fehler'
+let agentSearch = '';
 
 // ── Dark Mode ────────────────────────────────────────────────
 let darkMode = localStorage.getItem('darkMode') !== 'false' &&
@@ -538,13 +602,24 @@ function connect() {
     if (d.totalDuration != null) { state.totalDuration = d.totalDuration; state.completedAt = Date.now(); }
     if (d.phase === 'running') { startElapsedTimer(); if (fileTreeOpen) startFileTreePolling(); }
     if (d.phase === 'awaiting_approval') { stopElapsedTimer(); }
-    if (d.phase === 'complete' || d.phase === 'error') { stopElapsedTimer(); if (fileTreeOpen) loadFileTree(); }
+    if (d.phase === 'complete' || d.phase === 'error' || d.phase === 'partial') { stopElapsedTimer(); if (fileTreeOpen) loadFileTree(); }
+    // Partial: fehlgeschlagene Agenten merken
+    if (d.phase === 'partial' && d.failedAgents) {
+      state._failedAgents = d.failedAgents;
+      state._successCount = d.successCount;
+      state._failedCount = d.failedCount;
+    }
     // Notifications
     if (d.phase === 'complete') {
       var agentCount = (state.agents || []).length;
       var projName = state.projectTitle || 'Projekt';
       showNotification(projName, 'Projekt abgeschlossen! Alle ' + agentCount + ' Agenten fertig.');
       playSuccessBeep();
+    }
+    if (d.phase === 'partial') {
+      var projName2 = state.projectTitle || 'Projekt';
+      showNotification(projName2, (d.successCount || '?') + ' von ' + ((d.successCount || 0) + (d.failedCount || 0)) + ' Agenten erfolgreich.');
+      playErrorBeep();
     }
     if (d.phase === 'error') {
       showNotification(state.projectTitle || 'Projekt', 'Ein Fehler ist aufgetreten.');
@@ -642,6 +717,18 @@ function connect() {
     addBanner('warn', text);
   });
 
+  es.addEventListener('auto_retry', function(e) {
+    var d = JSON.parse(e.data);
+    var agentNum = (d.index != null ? d.index + 1 : '?');
+    var text = 'Agent ' + agentNum + ' fehlgeschlagen. Automatischer Neuversuch in 10s\u2026 (Grund: ' + (d.reason || 'Unbekannt') + ')';
+    addBanner('warn', text);
+    // Update agent status in state
+    if (d.index != null && state.agents[d.index]) {
+      state.agents[d.index].status = 'retrying';
+      updateAgentCard(d.index, state.agents[d.index]);
+    }
+  });
+
   es.addEventListener('error', function(e) {
     if (e.data) {
       try {
@@ -711,9 +798,11 @@ var BADGE_MAP = {
   waiting:  ['Wartend',  '#F1EFE8','#888780', false],
   working:  ['Arbeitet', '#E6F1FB','#185FA5', true],
   asking:   ['Fragt\u2026',   '#FAEEDA','#854F0B', true],
+  retrying: ['Retry\u2026',  '#FAEEDA','#854F0B', true],
   done:     ['Fertig',   '#E1F5EE','#0F6E56', false],
   waiting_deps: ['Wartet…', '#FAEEDA','#854F0B', true],
   error:    ['Fehler',   '#FCEBEB','#A32D2D', false],
+  partial:  ['Teilweise', '#FAEEDA','#854F0B', false],
   complete: ['Fertig',   '#E1F5EE','#0F6E56', false]
 };
 
@@ -898,6 +987,7 @@ function renderSetup() {
         '<input type="checkbox" id="approvalCheck"> Plan vor Start pr\u00FCfen' +
       '</label>' +
     '</div>' +
+    '<div class="shortcuts-hint">Drücke ? für Tastenkürzel</div>' +
     '<div id="historyArea" class="history-list"></div>' +
   '</div>';
 }
@@ -977,6 +1067,43 @@ async function modifyAndApprove() {
   }
 }
 
+// ── Agent Filter ──────────────────────────────────────────────
+function filterAgents() {
+  var agents = state.agents || [];
+  var result = [];
+  for (var i = 0; i < agents.length; i++) {
+    var a = agents[i];
+    // Status filter
+    if (agentFilter === 'aktiv' && a.status !== 'working' && a.status !== 'asking' && a.status !== 'waiting' && a.status !== 'waiting_deps') continue;
+    if (agentFilter === 'fertig' && a.status !== 'done') continue;
+    if (agentFilter === 'fehler' && a.status !== 'error') continue;
+    // Search filter
+    if (agentSearch) {
+      var q = agentSearch.toLowerCase();
+      var titleMatch = (a.title || '').toLowerCase().indexOf(q) !== -1;
+      var taskMatch = (a.task || '').toLowerCase().indexOf(q) !== -1;
+      var convMatch = false;
+      var conv = a.conversation || [];
+      for (var j = 0; j < conv.length; j++) {
+        if ((conv[j].text || '').toLowerCase().indexOf(q) !== -1) { convMatch = true; break; }
+      }
+      if (!titleMatch && !taskMatch && !convMatch) continue;
+    }
+    result.push({ agent: a, index: i });
+  }
+  return result;
+}
+
+function setAgentFilter(f) {
+  agentFilter = f;
+  render();
+}
+
+function setAgentSearch(val) {
+  agentSearch = val;
+  render();
+}
+
 // ── Render: Dashboard ────────────────────────────────────────
 function renderDashboard() {
   var agents = state.agents || [];
@@ -986,6 +1113,7 @@ function renderDashboard() {
   var pct = total > 0 ? Math.round(done / total * 100) : 0;
   var totalQ = (coord.log || []).length;
   var isComplete = state.phase === 'complete';
+  var isPartial = state.phase === 'partial';
   var working = agents.filter(function(a) { return a.status === 'working' || a.status === 'asking'; }).length;
 
   var html = '<div class="stack" style="padding-top:0.5rem">';
@@ -1024,6 +1152,45 @@ function renderDashboard() {
     }
   }
 
+  // Partial banner (teilweiser Erfolg)
+  if (isPartial) {
+    var successCount = state._successCount || agents.filter(function(a) { return a.status === 'done'; }).length;
+    var failedCount = state._failedCount || agents.filter(function(a) { return a.status === 'error'; }).length;
+    var failedIdxs = state._failedAgents || agents.map(function(a, i) { return a.status === 'error' ? i : -1; }).filter(function(i) { return i >= 0; });
+    var totalRoundsP = agents.reduce(function(sum, a) { return sum + (a.rounds || 0); }, 0);
+
+    html += '<div class="partial-banner fadein">' +
+      '<div style="flex:1">' +
+        '<div class="partial-title">\u26A0 ' + esc(String(successCount)) + ' von ' + esc(String(total)) + ' Agenten erfolgreich. ' + esc(String(failedCount)) + ' fehlgeschlagen.</div>' +
+        '<div class="partial-sub">' + esc(String(totalRoundsP)) + ' Runden' + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + '</div>' +
+        (state.projectDir ? '<div class="partial-path">' + esc(state.projectDir) + '</div>' : '') +
+        '<div class="partial-retry-btns">' +
+          failedIdxs.map(function(idx) {
+            return '<button class="btn-retry" onclick="retryAgent(' + idx + ')">Agent ' + (idx + 1) + ' neu starten</button>';
+          }).join(' ') +
+        '</div>' +
+      '</div>' +
+      '<button class="btn-outline" onclick="exportProject()">ZIP Export</button> ' +
+      '<button class="btn-outline" onclick="loadMergedFiles()">Zusammengef\u00FChrte Dateien</button> ' +
+      '<button class="btn-outline" onclick="resetProject()">Neues Projekt</button>' +
+    '</div>';
+
+    // Zusammengefuehrte Dateien auch bei partial anzeigen
+    if (mergedFiles && mergedFiles.files && mergedFiles.files.length > 0) {
+      html += '<div class="card fadein" style="border-color:var(--amber);margin-top:0.5rem">' +
+        '<div class="section-label">Zusammengef\u00FChrte Dateien (nur erfolgreiche Agenten)</div>' +
+        '<div style="font-size:12px;color:var(--txt2);margin-bottom:8px">' + esc(mergedFiles.dir || '') + '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px">';
+      for (var pi = 0; pi < mergedFiles.files.length; pi++) {
+        var pf = mergedFiles.files[pi];
+        var pfname = typeof pf === 'string' ? pf : pf.name;
+        var pfsize = typeof pf === 'object' && pf.size ? ' (' + (pf.size < 1024 ? pf.size + ' B' : Math.round(pf.size / 1024) + ' KB') + ')' : '';
+        html += '<div style="font-family:var(--mono);font-size:12px;padding:4px 8px;background:var(--bg2);border-radius:var(--radius-sm)">' + esc(pfname) + '<span style="color:var(--txt3)">' + esc(pfsize) + '</span></div>';
+      }
+      html += '</div></div>';
+    }
+  }
+
   // Project header
   html += '<div class="card">' +
     '<div class="proj-header">' +
@@ -1052,12 +1219,22 @@ function renderDashboard() {
 
   // Agents
   if (agents.length > 0) {
+    var filtered = filterAgents();
+    var filterBtns = ['alle','aktiv','fertig','fehler'];
+    var filterLabels = { alle: 'Alle', aktiv: 'Aktiv', fertig: 'Fertig', fehler: 'Fehler' };
     html += '<div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center">' +
         '<div class="section-label" style="margin-bottom:0">Agenten (' + esc(String(total)) + ')</div>' +
         '<button class="btn-outline" id="toggleDetailsBtn" onclick="toggleAllDetails()" style="font-size:11px;padding:4px 10px">' + (allDetailsExpanded ? 'Details ausblenden' : 'Alle Details anzeigen') + '</button>' +
       '</div>' +
-      '<div class="agent-grid" style="margin-top:8px">' + agents.map(function(a, i) { return renderAgent(a, i); }).join('') + '</div>' +
+      '<div class="filter-bar" style="margin-top:8px">' +
+        '<input class="filter-input" type="text" placeholder="Agenten durchsuchen\u2026" value="' + esc(agentSearch) + '" oninput="setAgentSearch(this.value)" id="agentSearchInput">' +
+        filterBtns.map(function(f) {
+          return '<button class="filter-btn' + (agentFilter === f ? ' active' : '') + '" onclick="setAgentFilter(\'' + f + '\')">' + esc(filterLabels[f]) + '</button>';
+        }).join('') +
+        '<span class="filter-count">' + esc(String(filtered.length)) + ' von ' + esc(String(total)) + '</span>' +
+      '</div>' +
+      '<div class="agent-grid" style="margin-top:8px">' + filtered.map(function(item) { return renderAgent(item.agent, item.index); }).join('') + '</div>' +
     '</div>';
   }
 
@@ -1165,11 +1342,18 @@ function openAgentModal(idx) {
       '</div>' +
       (agent.task ? '<div class="modal-agent-task">' + esc(agent.task) + '</div>' : '') +
     '</div>' +
+    '<div class="modal-search">' +
+      '<input class="modal-search-input" type="text" placeholder="Im Verlauf suchen\u2026" oninput="searchModalConv(this.value)" id="modalSearchInput">' +
+      '<span class="modal-search-count" id="modalSearchCount"></span>' +
+    '</div>' +
     '<div class="section-label">Vollst\u00E4ndiger Verlauf (' + esc(String(conv.length)) + ' Nachrichten)</div>' +
-    '<div class="modal-conv">' + bubblesHtml + '</div>' +
+    '<div class="modal-conv" id="modalConvContent">' + bubblesHtml + '</div>' +
   '</div>';
 
   document.body.appendChild(overlay);
+  // Store original bubbles HTML and conv for search
+  overlay._originalBubbles = bubblesHtml;
+  overlay._conv = conv;
   // Close on Escape key
   document.addEventListener('keydown', modalKeyHandler);
 }
@@ -1182,6 +1366,60 @@ function closeModal() {
 
 function modalKeyHandler(e) {
   if (e.key === 'Escape') closeModal();
+}
+
+function searchModalConv(query) {
+  var modal = document.getElementById('agentModal');
+  if (!modal) return;
+  var convEl = document.getElementById('modalConvContent');
+  var countEl = document.getElementById('modalSearchCount');
+  if (!convEl) return;
+
+  var conv = modal._conv || [];
+  if (!query || query.trim() === '') {
+    convEl.innerHTML = modal._originalBubbles || '';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+
+  var matchCount = 0;
+  var html = '';
+  if (conv.length === 0) {
+    html = '<div class="bubble-empty">Noch keine Nachrichten.</div>';
+  } else {
+    html = conv.map(function(m) {
+      var text = m.text || '';
+      var escaped = esc(text);
+      var highlighted = highlightText(escaped, query);
+      if (highlighted !== escaped) {
+        var tmpIdx = 0;
+        var lowerEsc = escaped.toLowerCase();
+        var lowerQ = esc(query).toLowerCase();
+        while ((tmpIdx = lowerEsc.indexOf(lowerQ, tmpIdx)) !== -1) { matchCount++; tmpIdx += lowerQ.length; }
+      }
+      var copyBtn = '<button class="copy-btn" onclick="copyText(this)" title="Kopieren">\u2398</button>';
+      if (m.from === 'coordinator') {
+        return '<div class="bubble-wrap right"><div class="bubble bubble-coordinator">' + copyBtn +
+          '<div class="bubble-label">Koordinator \u2192</div><div class="bubble-text">' + highlighted + '</div></div></div>';
+      } else if (m.type === 'question') {
+        return '<div class="bubble-wrap"><div class="bubble bubble-question">' + copyBtn +
+          '<div class="bubble-label">Frage \u2192</div><div class="bubble-text">' + highlighted + '</div></div></div>';
+      } else {
+        return '<div class="bubble-wrap"><div class="bubble bubble-agent">' + copyBtn +
+          '<div class="bubble-text">' + highlighted + '</div></div></div>';
+      }
+    }).join('');
+  }
+
+  convEl.innerHTML = html;
+  if (countEl) countEl.textContent = matchCount > 0 ? matchCount + ' Treffer' : 'Keine Treffer';
+}
+
+function highlightText(escapedHtml, query) {
+  if (!query) return escapedHtml;
+  var escapedQuery = esc(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  var regex = new RegExp('(' + escapedQuery + ')', 'gi');
+  return escapedHtml.replace(regex, '<mark>$1</mark>');
 }
 
 function toggleAllDetails() {
@@ -1582,7 +1820,8 @@ function renderFileTree(files) {
       '</button>' +
       '<div class="file-group-items" id="fg-' + esc(name) + '"' + (collapsed ? ' style="display:none"' : '') + '>';
     items.forEach(function(f) {
-      html += '<div class="file-item">' +
+      var fullPath = name + '/' + f.path;
+      html += '<div class="file-item file-item-clickable" onclick="openFileContent(\'' + esc(fullPath).replace(/'/g, "\\'") + '\')">' +
         '<span class="file-icon">' + fileIcon(f.path) + '</span>' +
         '<span class="file-name" title="' + esc(f.path) + '">' + esc(f.path) + '</span>' +
         '<span class="file-size">' + esc(formatFileSize(f.size)) + '</span>' +
@@ -1594,7 +1833,7 @@ function renderFileTree(files) {
   // Root-level files
   if (rootFiles.length > 0) {
     rootFiles.forEach(function(f) {
-      html += '<div class="file-item">' +
+      html += '<div class="file-item file-item-clickable" onclick="openFileContent(\'' + esc(f.path).replace(/'/g, "\\'") + '\')">' +
         '<span class="file-icon">' + fileIcon(f.path) + '</span>' +
         '<span class="file-name" title="' + esc(f.path) + '">' + esc(f.path) + '</span>' +
         '<span class="file-size">' + esc(formatFileSize(f.size)) + '</span>' +
@@ -1605,9 +1844,86 @@ function renderFileTree(files) {
   container.innerHTML = html;
 }
 
+
+// ── File Content Viewer ──────────────────────────────────────
+function openFileContent(filePath) {
+  var id = getProjectId();
+  if (!id) return;
+
+  closeFileModal();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'fileModal';
+  overlay.onclick = function(e) { if (e.target === overlay) closeFileModal(); };
+  overlay.innerHTML = '<div class="modal file-modal">' +
+    '<button class="modal-close" onclick="closeFileModal()" title="Schlie\u00DFen">\u00D7</button>' +
+    '<div class="file-modal-header"><div class="file-modal-info"><div class="file-modal-path">' + esc(filePath) + '</div><div class="file-modal-size">Wird geladen\u2026</div></div></div>' +
+    '<div class="file-modal-body"><pre><code>Wird geladen\u2026</code></pre></div>' +
+  '</div>';
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', fileModalKeyHandler);
+
+  var url = '/api/file-content/' + encodeURIComponent(id) + '/' + encodeURIComponent(filePath);
+  fetch(url).then(function(r) {
+    if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Fehler'); });
+    return r.json();
+  }).then(function(data) {
+    var modal = document.querySelector('#fileModal .modal');
+    if (!modal) return;
+
+    var sizeText = formatFileSize(data.size);
+    var headerHtml = '<div class="file-modal-info">' +
+      '<div class="file-modal-path">' + esc(data.path) + '</div>' +
+      '<div class="file-modal-size">' + esc(sizeText) + '</div>' +
+    '</div>';
+
+    var bodyHtml;
+    if (data.binary) {
+      headerHtml += '<div class="file-modal-actions"></div>';
+      bodyHtml = '<div class="file-modal-binary">Bin\u00E4rdatei (' + esc(sizeText) + ')</div>';
+    } else {
+      headerHtml += '<div class="file-modal-actions"><button class="file-modal-copy" onclick="copyFileContent()" title="Inhalt kopieren">Kopieren</button></div>';
+      bodyHtml = '<pre><code id="fileContentCode">' + esc(data.content) + '</code></pre>';
+    }
+
+    modal.innerHTML = '<button class="modal-close" onclick="closeFileModal()" title="Schlie\u00DFen">\u00D7</button>' +
+      '<div class="file-modal-header">' + headerHtml + '</div>' +
+      '<div class="file-modal-body">' + bodyHtml + '</div>';
+  }).catch(function(err) {
+    var modal = document.querySelector('#fileModal .modal');
+    if (!modal) return;
+    modal.innerHTML = '<button class="modal-close" onclick="closeFileModal()" title="Schlie\u00DFen">\u00D7</button>' +
+      '<div class="file-modal-header"><div class="file-modal-info"><div class="file-modal-path">' + esc(filePath) + '</div></div></div>' +
+      '<div class="file-modal-body"><div class="file-modal-binary">Fehler: ' + esc(err.message) + '</div></div>';
+  });
+}
+
+function closeFileModal() {
+  var modal = document.getElementById('fileModal');
+  if (modal) modal.remove();
+  document.removeEventListener('keydown', fileModalKeyHandler);
+}
+
+function fileModalKeyHandler(e) {
+  if (e.key === 'Escape') closeFileModal();
+}
+
+function copyFileContent() {
+  var codeEl = document.getElementById('fileContentCode');
+  if (!codeEl) return;
+  navigator.clipboard.writeText(codeEl.textContent).then(function() {
+    var btn = document.querySelector('#fileModal .file-modal-copy');
+    if (btn) {
+      btn.textContent = 'Kopiert!';
+      setTimeout(function() { btn.textContent = 'Kopieren'; }, 1500);
+    }
+  });
+}
+
 function startFileTreePolling() {
   stopFileTreePolling();
-  if (state.phase === 'running' || state.phase === 'complete') {
+  if (state.phase === 'running' || state.phase === 'complete' || state.phase === 'partial') {
     fileTreeTimer = setInterval(function() {
       if (fileTreeOpen) loadFileTree();
       if (state.phase !== 'running') stopFileTreePolling();
@@ -1617,6 +1933,7 @@ function startFileTreePolling() {
 
 function stopFileTreePolling() {
   if (fileTreeTimer) { clearInterval(fileTreeTimer); fileTreeTimer = null; }
+}
 // ── Settings Panel ────────────────────────────────────────────
 var SETTINGS_FIELDS = [
   { key: 'agentTimeout',   label: 'Agent-Timeout (ms)',           hint: 'Min: 30.000 / Max: 1.800.000', min: 30000, max: 1800000 },
@@ -1713,7 +2030,113 @@ function saveSettings() {
     });
 }
 
+
+
+// -- Keyboard Shortcuts ----------------------------------------
+function showShortcutsHelp() {
+  // Close any existing shortcuts modal
+  closeShortcutsHelp();
+  var overlay = document.createElement('div');
+  overlay.id = 'shortcutsModal';
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) closeShortcutsHelp(); };
+
+  overlay.innerHTML = '<div class="modal" style="max-width:420px">' +
+    '<button class="modal-close" onclick="closeShortcutsHelp()" title="Schließen">×</button>' +
+    '<h3 style="font-size:16px;font-weight:600;margin-bottom:1rem">Tastenkürzel</h3>' +
+    '<div class="shortcuts-grid">' +
+      '<kbd>?</kbd><span class="shortcut-desc">Diese Hilfe anzeigen</span>' +
+      '<kbd>F1</kbd><span class="shortcut-desc">Diese Hilfe anzeigen</span>' +
+      '<kbd>Esc</kbd><span class="shortcut-desc">Modal schließen</span>' +
+      '<kbd>d</kbd><span class="shortcut-desc">Dark/Light Mode umschalten</span>' +
+      '<kbd>s</kbd><span class="shortcut-desc">Benachrichtigungston ein/aus</span>' +
+      '<kbd>r</kbd><span class="shortcut-desc">Projekt zurücksetzen (nur wenn fertig)</span>' +
+      '<kbd>1-9</kbd><span class="shortcut-desc">Agent-Details öffnen</span>' +
+      '<kbd>f</kbd><span class="shortcut-desc">Suchfeld fokussieren</span>' +
+      '<kbd>e</kbd><span class="shortcut-desc">ZIP exportieren (nur wenn fertig)</span>' +
+    '</div>' +
+  '</div>';
+
+  document.body.appendChild(overlay);
 }
+
+function closeShortcutsHelp() {
+  var el = document.getElementById('shortcutsModal');
+  if (el) el.remove();
+}
+
+document.addEventListener('keydown', function(e) {
+  // Ignore when typing in input or textarea
+  var tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+
+  // Ignore if modifier keys are held (except shift for ?)
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  var key = e.key;
+
+  // ? or F1 - show shortcuts help
+  if (key === '?' || key === 'F1') {
+    e.preventDefault();
+    showShortcutsHelp();
+    return;
+  }
+
+  // Escape - close any open modal
+  if (key === 'Escape') {
+    var shortcuts = document.getElementById('shortcutsModal');
+    if (shortcuts) { closeShortcutsHelp(); return; }
+    // Agent modal and settings modal have their own handlers
+    return;
+  }
+
+  // d - toggle dark mode
+  if (key === 'd') {
+    toggleDarkMode();
+    return;
+  }
+
+  // s - toggle sound
+  if (key === 's') {
+    toggleSound();
+    return;
+  }
+
+  // r - reset project (only when complete or error)
+  if (key === 'r') {
+    if (state.phase === 'complete' || state.phase === 'error') {
+      resetProject();
+    }
+    return;
+  }
+
+  // 1-9 - open agent modal
+  if (key >= '1' && key <= '9') {
+    var idx = parseInt(key) - 1;
+    if (state.agents && idx < state.agents.length) {
+      openAgentModal(idx);
+    }
+    return;
+  }
+
+  // f - focus filter/search input
+  if (key === 'f') {
+    var filterInput = document.querySelector('.filter-input') || document.querySelector('.modal-search-input');
+    if (filterInput) {
+      e.preventDefault();
+      filterInput.focus();
+    }
+    return;
+  }
+
+  // e - export ZIP
+  if (key === 'e') {
+    if (state.phase === 'complete') {
+      exportProject();
+    }
+    return;
+  }
+});
 
 // ── Init ─────────────────────────────────────────────────────
 connect();

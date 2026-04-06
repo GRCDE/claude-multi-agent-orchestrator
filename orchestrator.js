@@ -20,6 +20,7 @@ const CONFIG = {
   maxAgents: parseInt(process.env.MAX_AGENTS) || 10,
   concurrency: parseInt(process.env.AGENT_CONCURRENCY) || 3,
   maxRounds: 5,
+  autoRetry: process.env.AUTO_RETRY !== 'false',
 };
 
 // ── Semaphore für parallele Ausführung ────────────────────────
@@ -675,10 +676,35 @@ class Orchestrator extends EventEmitter {
         } catch (e) {
           if (!this._abortController.signal.aborted) {
             logger.error('Agent-Fehler', { agent: i + 1, error: e.message });
-            this._patchAgent(i, { status: 'error' });
-            this._addAgentMsg(i, { from: 'agent', text: `Fehler: ${sanitizeError(e.message)}`, type: 'work' });
             await this._sendWebhook('agent_error', { agentIndex: i, task: this.tasks[i]?.title || '', error: sanitizeError(e.message) });
             await this._runHook('onError', { phase: `agent-${i + 1}`, error: e });
+
+            // Auto-Retry: einmal automatisch wiederholen
+            if (CONFIG.autoRetry && !this._abortController.signal.aborted) {
+              logger.info('Auto-Retry Agent', { agent: i + 1 });
+              this._patchAgent(i, { status: 'retrying' });
+              this._addAgentMsg(i, { from: 'agent', text: `Fehler: ${sanitizeError(e.message)} — Automatischer Neuversuch in 10s…`, type: 'work' });
+              this.emit('auto_retry', { index: i, attempt: 2, reason: sanitizeError(e.message) });
+              await new Promise(r => setTimeout(r, 10000));
+              try {
+                // Agent-State zurücksetzen für den Retry
+                this.agents[i].conversation = [];
+                this.agents[i].rounds = 0;
+                this.agents[i].questions = 0;
+                this.agents[i].startTime = null;
+                this.agents[i].endTime = null;
+                this.agents[i].duration = null;
+                await this._runAgent(i);
+              } catch (e2) {
+                // Zweiter Fehlschlag — endgültig aufgeben
+                logger.error('Auto-Retry fehlgeschlagen', { agent: i + 1, error: e2.message });
+                this._patchAgent(i, { status: 'error' });
+                this._addAgentMsg(i, { from: 'agent', text: `Endgültiger Fehler: ${sanitizeError(e2.message)}`, type: 'work' });
+              }
+            } else {
+              this._patchAgent(i, { status: 'error' });
+              this._addAgentMsg(i, { from: 'agent', text: `Fehler: ${sanitizeError(e.message)}`, type: 'work' });
+            }
           }
         } finally {
           semaphore.release();
@@ -690,22 +716,71 @@ class Orchestrator extends EventEmitter {
 
     if (this._abortController.signal.aborted) return;
 
-    // Koordinator-Zusammenfassung erstellen
+    // Ergebnis-Analyse: welche Agenten erfolgreich, welche fehlgeschlagen?
+    const successAgents = this.agents.filter(a => a.status === 'done');
+    const failedAgents = this.agents.filter(a => a.status === 'error');
+    const allFailed = failedAgents.length === this.agents.length;
+    const someFailed = failedAgents.length > 0 && !allFailed;
+
+    if (allFailed) {
+      // Alle Agenten fehlgeschlagen → Error-Phase
+      this.phase = 'error';
+      this.completedAt = Date.now();
+      this.totalDuration = Math.round((this.completedAt - (this.startedAt || this.completedAt)) / 1000);
+      logger.error('Alle Agenten fehlgeschlagen', { projectId: this.projectId, totalDuration: this.totalDuration });
+      this.emit('phase', { phase: 'error', totalDuration: this.totalDuration, failedAgents: failedAgents.map(a => a.id) });
+      await this._sendWebhook('project_error', {
+        title: this.projectTitle,
+        totalDuration: this.totalDuration,
+        agents: this.agents.map(a => ({ title: a.title, status: a.status })),
+      });
+      await this._runHook('onError', { phase: 'all_agents_failed', failedCount: failedAgents.length });
+      await this._saveState();
+      return;
+    }
+
+    // Koordinator-Zusammenfassung erstellen (auch bei teilweisem Erfolg)
     await this._coordinatorSummary();
 
-    // Agenten-Outputs zusammenführen
-    await this._mergeOutputs();
+    // Agenten-Outputs zusammenführen (nur von erfolgreichen Agenten)
+    await this._mergeOutputs(someFailed ? successAgents.map(a => a.id) : null);
 
-    this.phase = 'complete';
     this.completedAt = Date.now();
     this.totalDuration = Math.round((this.completedAt - (this.startedAt || this.completedAt)) / 1000);
-    logger.info('Projekt abgeschlossen', { projectId: this.projectId, agents: this.tasks.length, totalDuration: this.totalDuration });
-    this.emit('phase', { phase: 'complete', totalDuration: this.totalDuration });
-    await this._sendWebhook('project_completed', {
-      title: this.projectTitle,
-      totalDuration: this.totalDuration,
-      agents: this.agents.map(a => ({ title: a.title, status: a.status })),
-    });
+
+    if (someFailed) {
+      // Teilweiser Erfolg → Partial-Phase
+      this.phase = 'partial';
+      logger.warn('Projekt teilweise abgeschlossen', {
+        projectId: this.projectId,
+        success: successAgents.length,
+        failed: failedAgents.length,
+        totalDuration: this.totalDuration,
+      });
+      this.emit('phase', {
+        phase: 'partial',
+        totalDuration: this.totalDuration,
+        successCount: successAgents.length,
+        failedCount: failedAgents.length,
+        failedAgents: failedAgents.map(a => a.id),
+      });
+      await this._sendWebhook('project_partial', {
+        title: this.projectTitle,
+        totalDuration: this.totalDuration,
+        agents: this.agents.map(a => ({ title: a.title, status: a.status })),
+      });
+    } else {
+      // Alle erfolgreich → Complete-Phase
+      this.phase = 'complete';
+      logger.info('Projekt abgeschlossen', { projectId: this.projectId, agents: this.tasks.length, totalDuration: this.totalDuration });
+      this.emit('phase', { phase: 'complete', totalDuration: this.totalDuration });
+      await this._sendWebhook('project_completed', {
+        title: this.projectTitle,
+        totalDuration: this.totalDuration,
+        agents: this.agents.map(a => ({ title: a.title, status: a.status })),
+      });
+    }
+
     await this._runHook('onComplete', { projectId: this.projectId, totalDuration: this.totalDuration, agents: this.agents });
     await this._saveState();
   }
@@ -975,7 +1050,7 @@ Antworte in 3-6 Sätzen, klar und konkret.`;
   }
 
   // ── Agenten-Outputs zusammenführen ──────────────────────────
-  async _mergeOutputs() {
+  async _mergeOutputs(onlyAgentIds = null) {
     try {
       const mergedDir = path.join(this.projectDir, 'merged');
       await fsp.mkdir(mergedDir, { recursive: true });
@@ -985,6 +1060,8 @@ Antworte in 3-6 Sätzen, klar und konkret.`;
       const fileTracker = new Map(); // Dateiname → Agent-Index (für Konflikterkennung)
 
       for (let i = 0; i < this.agents.length; i++) {
+        // Bei partiellem Erfolg nur erfolgreiche Agenten mergen
+        if (onlyAgentIds !== null && !onlyAgentIds.includes(i)) continue;
         const agent = this.agents[i];
         if (!agent.workDir) continue;
 

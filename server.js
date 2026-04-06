@@ -368,6 +368,57 @@ app.get('/api/files/:id', (req, res) => {
   res.json(list(dir));
 });
 
+// ── Datei-Inhalt API ──────────────────────────────────────
+const BINARY_EXTENSIONS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.ico',
+  '.woff', '.woff2', '.ttf', '.eot',
+  '.zip', '.tar', '.gz', '.exe', '.dll', '.so', '.dylib'
+]);
+const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB
+
+app.get('/api/file-content/:id/:filePath(*)', apiLimiter, (req, res) => {
+  const projectDir = path.join(__dirname, 'projects', req.params.id);
+  const filePath = decodeURIComponent(req.params.filePath);
+  const resolved = path.resolve(projectDir, filePath);
+
+  // Pfad-Traversal verhindern
+  const normalizedProjectDir = path.resolve(projectDir);
+  if (!resolved.startsWith(normalizedProjectDir + path.sep) && resolved !== normalizedProjectDir) {
+    return res.status(400).json({ error: 'Ungültiger Pfad' });
+  }
+
+  if (!fs.existsSync(resolved)) {
+    return res.status(404).json({ error: 'Datei nicht gefunden' });
+  }
+
+  let stat;
+  try {
+    stat = fs.statSync(resolved);
+  } catch {
+    return res.status(404).json({ error: 'Datei nicht gefunden' });
+  }
+
+  if (stat.isDirectory()) {
+    return res.status(400).json({ error: 'Pfad ist ein Verzeichnis' });
+  }
+
+  if (stat.size > MAX_FILE_SIZE) {
+    return res.status(413).json({ error: 'Datei zu groß (max 1 MB)', size: stat.size, path: filePath });
+  }
+
+  const ext = path.extname(resolved).toLowerCase();
+  if (BINARY_EXTENSIONS.has(ext)) {
+    return res.json({ binary: true, size: stat.size, path: filePath });
+  }
+
+  try {
+    const content = fs.readFileSync(resolved, 'utf8');
+    res.json({ content, size: stat.size, path: filePath });
+  } catch {
+    return res.status(500).json({ error: 'Datei konnte nicht gelesen werden' });
+  }
+});
+
 // ── ZIP Export ───────────────────────────────────────────
 app.get('/api/export/:id', (req, res) => {
   const dir = path.join(__dirname, 'projects', req.params.id);
