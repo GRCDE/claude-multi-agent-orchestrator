@@ -2,86 +2,291 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const orchestrator = require('./orchestrator');
+const fs = require('fs');
+const logger = require('./src/logger');
+const Orchestrator = require('./orchestrator');
 
+const orchestrator = new Orchestrator();
 const app = express();
-const PORT = process.env.PORT || 3131;
+const PORT = parseInt(process.env.PORT) || 3131;
 
-app.use(cors());
+// ── CORS auf localhost beschränken ───────────────────────────
+app.use(cors({
+  origin: [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`]
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── SSE clients ───────────────────────────────────────────────
-const clients = new Set();
+// ── Rate-Limiting ─────────────────────────────────────────────
+const rateLimit = require('express-rate-limit');
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 Minute
+  max: 10, // max 10 Requests pro Minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Anfragen. Bitte warte eine Minute.' }
+});
+
+const startLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 3, // max 3 Projekt-Starts pro Minute
+  message: { error: 'Zu viele Projekt-Starts. Bitte warte eine Minute.' }
+});
+
+// ── SSE Clients (Map mit Max 50) ────────────────────────────
+let clientIdCounter = 0;
+const clients = new Map();
+const MAX_CLIENTS = 50;
+
+// Heartbeat: Prüfe alle 30s ob Clients noch leben
+setInterval(() => {
+  for (const [id, res] of clients) {
+    try {
+      res.write(': heartbeat\n\n');
+    } catch {
+      clients.delete(id);
+    }
+  }
+}, 30000);
 
 function broadcast(eventName, data) {
   const msg = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const res of clients) {
-    try { res.write(msg); } catch {}
+  for (const [id, res] of clients) {
+    try {
+      res.write(msg);
+    } catch {
+      // Toter Client – entfernen
+      clients.delete(id);
+    }
   }
 }
 
-// Forward orchestrator events to all SSE clients
-orchestrator.on('update', ({ event, data }) => broadcast(event, data));
+// ── SSE Event-Batching ──────────────────────────────────────
+let eventBatch = [];
+let batchTimer = null;
+const BATCH_INTERVAL = 100; // ms
 
-// ── SSE endpoint ──────────────────────────────────────────────
+function queueBroadcast(eventName, data) {
+  eventBatch.push({ event: eventName, data });
+  if (!batchTimer) {
+    batchTimer = setTimeout(flushBatch, BATCH_INTERVAL);
+  }
+}
+
+function flushBatch() {
+  batchTimer = null;
+  if (eventBatch.length === 0) return;
+
+  const batch = eventBatch;
+  eventBatch = [];
+
+  // Einzelne Events senden (nicht als Array, damit Frontend kompatibel bleibt)
+  for (const { event, data } of batch) {
+    const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (const [id, res] of clients) {
+      try { res.write(msg); } catch { clients.delete(id); }
+    }
+  }
+}
+
+// Statt direktem broadcast: queueBroadcast verwenden
+orchestrator.on('update', ({ event, data }) => queueBroadcast(event, data));
+
+// ── SSE Endpoint ─────────────────────────────────────────────
 app.get('/api/stream', (req, res) => {
+  if (clients.size >= MAX_CLIENTS) {
+    return res.status(503).json({ error: 'Maximale Anzahl SSE-Verbindungen erreicht' });
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.flushHeaders();
 
-  // Send current state immediately
+  // Aktuellen Zustand sofort senden
   res.write(`event: state\ndata: ${JSON.stringify(orchestrator.getState())}\n\n`);
 
-  // Keep-alive
+  // Keep-alive Ping
   const ping = setInterval(() => {
     try { res.write(': ping\n\n'); } catch {}
-  }, 25000);
+  }, 30000);
 
-  clients.add(res);
-  req.on('close', () => { clearInterval(ping); clients.delete(res); });
-});
+  const id = ++clientIdCounter;
+  clients.set(id, res);
 
-// ── REST API ──────────────────────────────────────────────────
-app.post('/api/start', async (req, res) => {
-  const { description, agentCount } = req.body;
-  if (!description || !agentCount) {
-    return res.status(400).json({ error: 'description und agentCount erforderlich' });
-  }
-  if (orchestrator.phase === 'running') {
-    return res.status(409).json({ error: 'Projekt läuft bereits' });
-  }
-
-  res.json({ ok: true, message: 'Projekt gestartet' });
-
-  // Run async (non-blocking)
-  orchestrator.start(description, parseInt(agentCount)).catch(e => {
-    broadcast('error', { message: e.message });
+  req.on('close', () => {
+    clearInterval(ping);
+    clients.delete(id);
   });
 });
 
+// ── Race-Condition Schutz ────────────────────────────────────
+let isStarting = false;
+
+// ── REST API ─────────────────────────────────────────────────
+
+// Projekt starten (mit Input-Validierung + Race-Condition Fix)
+app.post('/api/start', startLimiter, async (req, res) => {
+  if (isStarting || orchestrator.phase === 'running') {
+    return res.status(409).json({ error: 'Projekt läuft bereits' });
+  }
+
+  const { description, agentCount } = req.body;
+
+  // Input-Validierung
+  if (!description || typeof description !== 'string') {
+    return res.status(400).json({ error: 'Beschreibung ist erforderlich und muss ein Text sein' });
+  }
+  if (description.length < 1 || description.length > 5000) {
+    return res.status(400).json({ error: 'Beschreibung muss zwischen 1 und 5000 Zeichen lang sein' });
+  }
+
+  const count = parseInt(agentCount);
+  if (!Number.isInteger(count) || count < 2 || count > 10) {
+    return res.status(400).json({ error: 'Agentenanzahl muss eine Ganzzahl zwischen 2 und 10 sein' });
+  }
+
+  isStarting = true;
+
+  try {
+    res.json({ ok: true, message: 'Projekt gestartet' });
+
+    // Async starten (non-blocking)
+    orchestrator.start(description, count).catch(e => {
+      logger.error('Projekt-Fehler', { error: e.message });
+      broadcast('error', { message: e.message });
+    }).finally(() => {
+      isStarting = false;
+    });
+  } catch (e) {
+    isStarting = false;
+    logger.error('Start-Fehler', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Status abfragen
 app.get('/api/status', (req, res) => {
   res.json(orchestrator.getState());
 });
 
-app.post('/api/reset', (req, res) => {
+// Projekt zurücksetzen
+app.post('/api/reset', apiLimiter, (req, res) => {
   orchestrator.reset();
+  isStarting = false;
   broadcast('state', orchestrator.getState());
   res.json({ ok: true });
 });
 
-// ── Start ─────────────────────────────────────────────────────
-app.listen(PORT, () => {
+// ── Health-Check ─────────────────────────────────────────────
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime()),
+    phase: orchestrator.phase,
+    memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
+  });
+});
+
+// ── Projekt-Historie ─────────────────────────────────────────
+
+// Alle Projekte auflisten
+app.get('/api/projects', (req, res) => {
+  const dir = path.join(__dirname, 'projects');
+  if (!fs.existsSync(dir)) return res.json([]);
+
+  const projects = fs.readdirSync(dir)
+    .filter(d => d.startsWith('proj_'))
+    .map(d => {
+      let state = null;
+      try {
+        state = JSON.parse(fs.readFileSync(path.join(dir, d, 'state.json'), 'utf8'));
+      } catch {}
+      return {
+        id: d,
+        title: state?.projectTitle || d,
+        phase: state?.phase || 'unknown',
+        agentCount: state?.agents?.length || 0,
+        createdAt: parseInt(d.replace('proj_', '')) || 0
+      };
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  res.json(projects);
+});
+
+// Einzelnes Projekt laden
+app.get('/api/projects/:id', (req, res) => {
+  const stateFile = path.join(__dirname, 'projects', req.params.id, 'state.json');
+  // Pfad-Traversal verhindern
+  if (!stateFile.startsWith(path.join(__dirname, 'projects'))) {
+    return res.status(400).json({ error: 'Ungültiger Pfad' });
+  }
+  try {
+    res.json(JSON.parse(fs.readFileSync(stateFile, 'utf8')));
+  } catch {
+    res.status(404).json({ error: 'Projekt nicht gefunden' });
+  }
+});
+
+// ── Dateibaum API ────────────────────────────────────────────
+app.get('/api/files/:id', (req, res) => {
+  const dir = path.join(__dirname, 'projects', req.params.id);
+  // Pfad-Traversal verhindern
+  if (!dir.startsWith(path.join(__dirname, 'projects'))) {
+    return res.status(400).json({ error: 'Ungültiger Pfad' });
+  }
+  if (!fs.existsSync(dir)) {
+    return res.status(404).json({ error: 'Nicht gefunden' });
+  }
+
+  function list(d, prefix = '') {
+    return fs.readdirSync(d, { withFileTypes: true }).flatMap(e => {
+      const rel = prefix ? prefix + '/' + e.name : e.name;
+      return e.isDirectory() ? list(path.join(d, e.name), rel) : [rel];
+    });
+  }
+
+  res.json(list(dir));
+});
+
+// ── Agent Retry ──────────────────────────────────────────────
+app.post('/api/retry/:agentIndex', apiLimiter, async (req, res) => {
+  const idx = parseInt(req.params.agentIndex);
+  if (isNaN(idx) || idx < 0) {
+    return res.status(400).json({ error: 'Ungültiger Index' });
+  }
+  res.json({ ok: true });
+  orchestrator.retryAgent(idx).catch(e => broadcast('error', { message: e.message }));
+});
+
+// ── Server starten ───────────────────────────────────────────
+const server = app.listen(PORT, () => {
   console.log('');
   console.log('  ╔═══════════════════════════════════════╗');
-  console.log('  ║   Claude Multi-Agent Orchestrator     ║');
+  console.log('  ║   Claude Multi-Agent Orchestrator v2  ║');
   console.log('  ╚═══════════════════════════════════════╝');
   console.log('');
-  console.log(`  Server läuft: http://localhost:${PORT}`);
-  console.log(`  Projekte:     ${path.join(__dirname, 'projects')}`);
+  console.log(`  Server:   http://localhost:${PORT}`);
+  console.log(`  Node:     ${process.version}`);
+  console.log(`  Projekte: ${path.join(__dirname, 'projects')}`);
   console.log('');
-  console.log('  Öffne http://localhost:' + PORT + ' im Browser');
-  console.log('');
+  logger.info('Server gestartet', { port: PORT });
 });
+
+// ── Graceful Shutdown ────────────────────────────────────────
+function gracefulShutdown(signal) {
+  logger.info('Shutdown eingeleitet', { signal });
+  orchestrator.reset();
+  for (const [, res] of clients) {
+    try { res.end(); } catch {}
+  }
+  clients.clear();
+  server.close(() => process.exit(0));
+  // Fallback: nach 10s hart beenden
+  setTimeout(() => process.exit(1), 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
