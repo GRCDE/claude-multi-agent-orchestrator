@@ -14,14 +14,14 @@ Agenten-Outputs werden automatisch zusammengefuehrt.
 Browser (public/index.html)
     | WebSocket (/ws) + SSE (/api/stream) + REST (port 3131)
     v
-Express Server (server.js) ~2900 Zeilen
+Express Server (server.js) ~4060 Zeilen
     - CORS, Rate-Limiting (differenziert: Read/Mutation/Start/Export)
     - Auth-Middleware (Bearer Token, timing-safe Vergleich)
     - Security Headers (CSP, HSTS, X-Frame-Options, etc.)
     - Compression (gzip), Input-Sanitierung
     - SSE Broadcast mit Event-Batching (100ms)
     - WebSocket Server (Dual-Mode: WS + SSE Fallback)
-    - REST API (60+ Endpoints)
+    - REST API (129 Endpoints)
     - Performance-Metriken (CPU, Memory, Endpoint-Statistiken)
     - Project Queue mit Auto-Dequeue + Prioritaeten
     - Webhook-Dispatching (Event-basiert, HMAC-SHA256 Signatur)
@@ -29,7 +29,7 @@ Express Server (server.js) ~2900 Zeilen
     - Projektuebergreifende Volltextsuche
     - Async File I/O (komplett, 0 sync fs-Aufrufe)
     v
-Orchestrator (orchestrator.js) ~3300 Zeilen -- EventEmitter-Klasse
+Orchestrator (orchestrator.js) ~4240 Zeilen -- EventEmitter-Klasse
     - Parallele Agent-Ausfuehrung (Semaphore, maxParallelAgents)
     - Dependency Graph (depends_on, Zyklen-Erkennung)
     - Auto-Retry bei Agent-Fehler (1x automatisch, 10s Wartezeit)
@@ -78,6 +78,21 @@ Dateisystem (projects/{id}/agent-{n}/)
 - **Interim Reports**: Koordinator erstellt Zwischenberichte alle N abgeschlossene Agenten.
 - **Konfigurierbares Pricing**: Input/Output Token-Kosten per ENV oder API einstellbar.
 - **Graceful Shutdown**: Checkpoint-Erstellung, Prozess-Cleanup, SSE/WS-Client-Schliessung.
+- **Rollen-Management (CRUD)**: Agenten-Rollen definieren, bearbeiten, loeschen. Persistiert in roles.json.
+- **Config-Profile**: Konfigurationsprofile speichern, laden, importieren/exportieren (profiles/).
+- **Undo/Redo**: Config- und Plan-Aenderungen rueckgaengig machen / wiederherstellen.
+- **Retry-Strategien**: Konfigurierbare Strategien (fixed, exponential, linear, etc.) per API waehlbar.
+- **Snapshot-Manager**: Projekt-Snapshots erstellen, vergleichen, wiederherstellen, loeschen (snapshots/).
+- **Batch-API**: Mehrere API-Requests in einem Batch ausfuehren (POST /api/batch). Statistiken + Blocked-Liste.
+- **I18n-API**: Mehrsprachige Uebersetzungen (GET /api/i18n, GET /api/i18n/:lang).
+- **API-Dokumentation**: Auto-generierte Docs (JSON, OpenAPI 3.0, Markdown, Swagger UI) unter /api/docs.
+- **Erweiterte Suche**: Volltext-Suche mit Suggestions, Log-Suche, Re-Indexing, Statistiken.
+- **Erweiterte Health-API**: Detaillierte Diagnostik, Alert-System, Schwellenwerte, Historie.
+- **Erweiterte Performance-API**: Agent-Performance, Verlauf, Realtime-Metriken.
+- **Managed Templates**: Erweiterte Template-Verwaltung mit Rating, Duplikation, Import/Export.
+- **Syntax-Highlighting**: Prism.js fuer Code-Anzeige im File-Viewer (JS, TS, Python, JSON, CSS, Bash, Markdown).
+- **Desktop-Notifications**: Native Browser-Notifications bei Projekt-Abschluss, Agent-Fehler, Agent-Fragen.
+- **Server-Log-Viewer**: Integrierter Log-Viewer im Frontend mit Filterung, Paginierung und JSONL-Export (Taste 'l').
 
 ## API-Referenz
 
@@ -160,9 +175,96 @@ Dateisystem (projects/{id}/agent-{n}/)
 |---|---|---|
 | GET | `/api/config` | Laufzeit-Konfiguration lesen |
 | POST | `/api/config` | Laufzeit-Konfiguration aendern |
+| POST | `/api/config/undo` | Letzte Config-Aenderung rueckgaengig machen |
+| POST | `/api/config/redo` | Config-Aenderung wiederherstellen |
 | GET | `/api/prompts` | Prompt-Templates + Variablen |
 | POST | `/api/prompts` | Prompt-Templates aktualisieren |
 | POST | `/api/prompts/reset` | Prompt-Templates auf Standard zuruecksetzen |
+| POST | `/api/plan/undo` | Letzte Plan-Aenderung rueckgaengig machen |
+| POST | `/api/plan/redo` | Plan-Aenderung wiederherstellen |
+| GET | `/api/undo-redo` | Undo/Redo-Status abfragen |
+
+### Rollen
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/roles` | Alle Rollen auflisten |
+| POST | `/api/roles` | Neue Rolle erstellen |
+| PUT | `/api/roles/:id` | Rolle aktualisieren |
+| DELETE | `/api/roles/:id` | Rolle loeschen |
+
+### Config-Profile
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/profiles` | Alle Profile auflisten |
+| GET | `/api/profiles/:name` | Einzelnes Profil laden |
+| POST | `/api/profiles` | Neues Profil erstellen |
+| DELETE | `/api/profiles/:name` | Profil loeschen |
+| POST | `/api/profiles/:name/apply` | Profil anwenden |
+| POST | `/api/profiles/save-current` | Aktuelle Config als Profil speichern |
+| POST | `/api/profiles/import` | Profil importieren |
+| GET | `/api/profiles/:name/export` | Profil exportieren |
+
+### Retry-Strategien
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/retry-strategies` | Verfuegbare Strategien auflisten |
+| GET | `/api/retry-strategy` | Aktive Strategie abfragen |
+| PUT | `/api/retry-strategy` | Aktive Strategie aendern |
+
+### Snapshots
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/snapshots` | Alle Snapshots auflisten (optional ?projectId=X) |
+| GET | `/api/snapshots/:id` | Einzelner Snapshot mit State |
+| POST | `/api/snapshots` | Manuellen Snapshot erstellen |
+| DELETE | `/api/snapshots/:id` | Snapshot loeschen |
+| POST | `/api/snapshots/:id/restore` | Snapshot wiederherstellen |
+| GET | `/api/snapshots/:id1/compare/:id2` | Zwei Snapshots vergleichen |
+| GET | `/api/snapshots/:id/size` | Snapshot-Groesse abfragen |
+
+### Batch
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| POST | `/api/batch` | Batch-Request verarbeiten |
+| GET | `/api/batch/stats` | Batch-Statistiken |
+| GET | `/api/batch/blocked` | Liste der blockierten Endpoints |
+
+### I18n
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/i18n` | Verfuegbare Sprachen |
+| GET | `/api/i18n/:lang` | Uebersetzungen fuer eine Sprache |
+
+### API-Dokumentation
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/docs` | Docs-Uebersicht (HTML) |
+| GET | `/api/docs/json` | API-Docs als JSON |
+| GET | `/api/docs/openapi` | OpenAPI 3.0 Spezifikation |
+| GET | `/api/docs/markdown` | API-Docs als Markdown |
+| GET | `/api/docs/ui/` | Swagger UI |
+
+### Managed Templates
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/templates/managed` | Alle Managed Templates |
+| POST | `/api/templates/managed` | Neues Managed Template erstellen |
+| GET | `/api/templates/managed/:id` | Einzelnes Managed Template |
+| PUT | `/api/templates/managed/:id` | Managed Template aktualisieren |
+| DELETE | `/api/templates/managed/:id` | Managed Template loeschen |
+| POST | `/api/templates/managed/:id/apply` | Managed Template anwenden |
+| POST | `/api/templates/managed/:id/duplicate` | Managed Template duplizieren |
+| GET | `/api/templates/managed/:id/export` | Managed Template exportieren |
+| POST | `/api/templates/managed/:id/rate` | Managed Template bewerten |
+| POST | `/api/templates/managed/import` | Managed Template importieren |
 
 ### Token-Budget
 
@@ -179,6 +281,10 @@ Dateisystem (projects/{id}/agent-{n}/)
 | GET | `/api/analytics` | Aggregierte Analytics (60s Cache): Timeline, Rollen, Kosten, Top-Projekte, Verteilung |
 | GET | `/api/stats` | Projekt-Statistiken (Anzahl, Score-Durchschnitt, Dateien, Zeilen) |
 | GET | `/api/disk-usage` | Speicherplatz-Info (Groesse, aeltestes/neuestes Projekt) |
+| GET | `/api/performance` | Performance-Uebersicht |
+| GET | `/api/performance/agents` | Agent-Performance-Statistiken |
+| GET | `/api/performance/history` | Performance-Verlauf |
+| GET | `/api/performance/realtime` | Realtime-Performance-Metriken |
 
 ### Metriken + Logs
 
@@ -196,6 +302,13 @@ Dateisystem (projects/{id}/agent-{n}/)
 |---|---|---|
 | GET | `/health` | Health-Check (Status, Uptime, Phase, Memory) |
 | GET | `/api/health` | Health-Check (identisch, alternativer Pfad) |
+| GET | `/api/health/detailed` | Detaillierter Health-Check (System-Diagnostik) |
+| GET | `/api/health/diagnostics` | Erweiterte Diagnostik-Informationen |
+| GET | `/api/health/history` | Health-Verlauf |
+| GET | `/api/health/alerts` | Aktive Health-Alerts |
+| POST | `/api/health/alerts/:id/clear` | Alert loeschen |
+| GET | `/api/health/thresholds` | Schwellenwerte abfragen |
+| PUT | `/api/health/thresholds` | Schwellenwerte aendern |
 
 ### Webhooks
 
@@ -221,6 +334,11 @@ Dateisystem (projects/{id}/agent-{n}/)
 | Methode | Pfad | Beschreibung |
 |---|---|---|
 | GET | `/api/search` | Projektuebergreifende Suche (q, scope: all/files/conversations/titles) |
+| GET | `/api/search/full` | Erweiterte Volltextsuche |
+| GET | `/api/search/suggest` | Suchvorschlaege |
+| GET | `/api/search/stats` | Such-Statistiken |
+| GET | `/api/search/logs` | Log-Suche |
+| POST | `/api/search/reindex` | Such-Index neu aufbauen |
 
 ### SSE + WebSocket
 
@@ -229,7 +347,7 @@ Dateisystem (projects/{id}/agent-{n}/)
 | GET `/api/stream` | SSE-Endpoint (Auto-Reconnect via Last-Event-ID, max 50 Clients, 5 pro IP) |
 | `/ws` | WebSocket-Endpoint (Upgrade-Handler, Heartbeat, Event-Subscription) |
 
-**Gesamt: 63 Endpoints** (43 REST + SSE + WebSocket)
+**Gesamt: 131 Endpoints** (129 REST + SSE + WebSocket)
 
 ## SSE-Events
 
@@ -383,22 +501,36 @@ Wenn `_subscribedEvents` gesetzt ist, werden nur abonnierte Events gesendet.
 
 ```
 Multiagents/
-├── server.js              Express Server, SSE, WebSocket, REST API, Security, Webhooks
-├── orchestrator.js        Orchestrator-Klasse, parallele Ausfuehrung, Merge, Recovery
+├── server.js              Express Server, SSE, WebSocket, REST API, Security, Webhooks (~4060 Zeilen)
+├── orchestrator.js        Orchestrator-Klasse, parallele Ausfuehrung, Merge, Recovery (~4240 Zeilen)
 ├── src/
-│   └── logger.js          Winston Logger + BufferTransport + Log-Rotation
+│   ├── logger.js          Winston Logger + BufferTransport + Log-Rotation
+│   ├── api-docs.js        Auto-generierte API-Dokumentation (JSON, OpenAPI, Markdown, Swagger UI)
+│   ├── batch-processor.js Batch-Request-Verarbeitung
+│   ├── config-profiles.js Config-Profil-Management (CRUD, Import/Export)
+│   ├── health-monitor.js  Erweitertes Health-Monitoring (Alerts, Diagnostik, Historie)
+│   ├── i18n.js            Internationalisierung (Mehrsprachigkeit)
+│   ├── log-search.js      Erweiterte Log-Suche
+│   ├── retry-strategies.js Konfigurierbare Retry-Strategien
+│   ├── snapshot-manager.js Snapshot-Verwaltung (CRUD, Vergleich, Restore)
+│   └── template-manager.js Erweiterte Template-Verwaltung (Rating, Duplikation)
 ├── public/
-│   └── index.html         GUI (Vanilla JS, Dark/Light, WebSocket/SSE, 3 Ansichten)
+│   └── index.html         GUI (Vanilla JS, Dark/Light, WebSocket/SSE, 3 Ansichten, ~12740 Zeilen)
 ├── projects/              Agent-Outputs + state.json + Checkpoints (auto-erstellt)
+├── profiles/              Config-Profile (JSON, auto-erstellt)
+├── snapshots/             Projekt-Snapshots (JSON, auto-erstellt)
+├── templates/             Managed Templates (JSON, auto-erstellt)
 ├── logs/                  Rotierte Log-Dateien (auto-erstellt)
+├── screenshots/           Screenshots (auto-erstellt)
 ├── __tests__/
 │   ├── unit/              31 Test-Dateien
-│   ├── api/               39 API-Test-Dateien
-│   ├── e2e/               1 Playwright Smoke Test
+│   ├── api/               54 API-Test-Dateien
+│   ├── e2e/               3 E2E-Test-Dateien (Smoke, Keyboard, Queue)
 │   └── integration/       1 Orchestrator E2E Test
 ├── .env.example           Konfigurationsvorlage
 ├── hooks.example.js       Hook-System Beispiel
 ├── templates.json         Projekt-Templates + Task-Presets
+├── roles.json             Agenten-Rollen-Definitionen
 ├── milestones.json        Meilenstein-Modus Definitionen
 ├── prompts.default.json   Standard-Prompt-Templates
 ├── webhooks.json          Registrierte Webhooks (auto-erstellt)
@@ -408,17 +540,18 @@ Multiagents/
 ├── docker-compose.yml     Docker Compose
 ├── package.json           v4.1.0
 ├── start.bat              Windows-Starter
+├── README.md              Projekt-README
 ├── ROADMAP.md             Feature-Roadmap
 └── CLAUDE.md              Diese Datei
 ```
 
 ## Tests
 
-72 Test-Suites (`npm test`):
+89 Test-Suites (`npm test`):
 
 - **Unit** (31): API-Docs, Backoff, Batch-Processor, Config, Config-Profiles, Config-Validation, Delta-Writes, Dependency, Dependency-Graph, Format-Detection, Health-Monitor, Hooks, I18n, Intervention, Intervention-Types, JSON-Parsing, Load-Project, Log-Search, Progress, Rate-Limit, Resume, Retry-Strategies, Scoring, Semaphore, Shared-Context, Snapshot-Manager, State-Persistence, Template-Manager, Timing, Token-Tracking, Webhook
-- **API** (39): Abort-Resume, Agent-Prompts, Analytics, Auth, Batch, Budget, Changelog, Config, Docs, Export, Export-Formats, File-Browser, Health, Health-Detailed, I18n-Strategies, Intervention, Merge, Metrics, Milestones, Performance, Profiles, Project-Lifecycle, Projects, Prompts, Queue, Queue-Priority, Recovery, Reorder, Roles, Search, Search-Full, Server, Snapshots, Stats, Templates, Templates-Managed, Undo-Redo, Webhooks
-- **E2E** (1): Playwright Smoke Test
+- **API** (54): Abort-Resume, Agent-Prompts, Analytics, Auth, Batch, Batch-Ops, Benchmark, Budget, Changelog, Config, Config-CRUD, Disk-Cleanup, Docs, Export, Export-Formats, File-Browser, File-Content, Health, Health-Alerts, Health-Detailed, I18n-Strategies, Intervention, Logs, Merge, Metrics, Milestones, Milestones-CRUD, Performance, Profiles, Profiles-CRUD, Project-Lifecycle, Projects, Prompts, Queue, Queue-Priority, Recovery, Reorder, Roles, Search, Search-Advanced, Search-Full, Security, Server, Snapshots, Snapshots-CRUD, SSE-Stream, Start-Reset, Stats, Templates, Templates-CRUD, Templates-Managed, Undo-Redo, Webhooks, Webhooks-CRUD
+- **E2E** (3): Smoke, Keyboard, Queue
 - **Integration** (1): Orchestrator E2E
 
 Jeder API-Test nutzt einen eigenen Port (3196+) um Konflikte zu vermeiden.
@@ -442,6 +575,7 @@ npm run test:coverage  # Coverage-Report
 | `1-9` | Agent-Details oeffnen |
 | `f` | Suchfeld fokussieren |
 | `e` | ZIP exportieren (nur wenn fertig) |
+| `l` | Server-Logs anzeigen/schliessen |
 | `Strg+Enter` | Projekt starten (im Setup) |
 
 ## Webhooks
@@ -504,7 +638,7 @@ Die Konfiguration erfolgt ueber Umgebungsvariablen in `docker-compose.yml` oder 
 npm install            # einmalig
 node server.js         # dann http://localhost:3131 oeffnen
 npm run dev            # mit Auto-Reload (--watch)
-npm test               # 40 Test-Suites
+npm test               # 89 Test-Suites
 ```
 
 Oder: `start.bat` doppelklicken (Windows)
@@ -568,6 +702,10 @@ Oder: `start.bat` doppelklicken (Windows)
 - Webhook-Dispatching mit HMAC-SHA256 Signatur und Retry
 - Project Queue mit Auto-Dequeue, Prioritaeten und exponential Backoff bei Fehlern
 - Durchschnittliche Projektdauer-Tracking fuer geschaetzte Wartezeiten
+- Modulare Service-Layer in `src/`: API-Docs, Batch-Processor, Config-Profiles, Health-Monitor, I18n, Log-Search, Retry-Strategies, Snapshot-Manager, Template-Manager
+- Rollen-Management (CRUD) mit Persistierung in roles.json
+- Undo/Redo fuer Config- und Plan-Aenderungen
+- Swagger UI Integration unter /api/docs/ui/
 
 ### public/index.html
 
@@ -581,7 +719,11 @@ Oder: `start.bat` doppelklicken (Windows)
 - `renderTokenPanel()` -- Token-Verbrauch Visualisierung
 - `renderActivityFeed()` -- Activity-Feed Panel
 - `escapeHtml()` / `esc()` -- XSS-Schutz fuer HTML-Ausgabe
-- Sound-Benachrichtigungen (Web Audio API) + Browser Notifications
+- `openLogViewer()` -- Server-Log-Viewer mit Filterung und Paginierung
+- `getPrismLanguage()` -- Syntax-Highlighting Sprach-Erkennung fuer File-Viewer
+- `showNotification()` -- Desktop-Notifications (Browser Notification API)
+- `updateRetryStrategyHint()` -- Retry-Strategie-Beschreibung in Einstellungen
+- Sound-Benachrichtigungen (Web Audio API) + Desktop Notifications
 
 ## Frontend-Features
 
@@ -591,13 +733,17 @@ Oder: `start.bat` doppelklicken (Windows)
 - **Analytics Dashboard** (Taste 'n')
 - **Token-Nutzung** mit Balkendiagramm pro Agent
 - **Activity Feed** (chronologisches Event-Log)
+- **Server-Log-Viewer** (Taste 'l'): Filterung nach Level/Kategorie, Paginierung, JSONL-Export
 - **Projekt-Warteschlange** (bis 10 Projekte, Prioritaeten, Drag&Drop)
 - **Agent-Intervention** (5 Typen: redirect, skip, restart, inject, complete)
 - **Conversation Inspector** (Tabs: Verlauf, Prompts, Dateien)
 - **Projekt-Vergleich** (2 Projekte nebeneinander)
 - **Bulk-Operationen** (Mehrfach-Auswahl, Loeschen, Export)
 - **Export**: ZIP, JSON, Markdown
-- **Sound-Benachrichtigungen** (Web Audio API) + Browser Notifications
+- **Syntax-Highlighting** (Prism.js): JS, TS, Python, JSON, CSS, Bash, Markdown, HTML im File-Viewer
+- **Retry-Strategy UI**: Strategie-Auswahl in Einstellungen mit Beschreibung
+- **Sound-Benachrichtigungen** (Web Audio API)
+- **Desktop-Notifications**: Native Browser-Notifications (Projekt fertig, Agent-Fehler, Agent-Fragen)
 - **Druckansicht** (`@media print`)
 - **Mobile Responsive + Accessibility** (ARIA-Attribute, Media Queries)
 
@@ -617,3 +763,7 @@ Oder: `start.bat` doppelklicken (Windows)
 - Input-Sanitierung gegen Prompt Injection (`sanitizeInput()`)
 - Intervention-Typen muessen aus `VALID_INTERVENTION_TYPES` stammen
 - Webhook-Secrets mindestens 8 Zeichen, Signatur per HMAC-SHA256
+- Neue Service-Module in `src/` ablegen, nicht in server.js direkt
+- Neue API-Tests erhalten eigene Ports (3196+) um Konflikte zu vermeiden
+- Snapshots, Profile und Templates in eigenen Verzeichnissen persistieren (JSON)
+- Retry-Strategien als benannte Konfigurationen, nicht hardcoded

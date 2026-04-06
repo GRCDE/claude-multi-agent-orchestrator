@@ -3,6 +3,9 @@
 
 'use strict';
 const path = require('path');
+const http = require('http');
+
+jest.setTimeout(60000);
 
 const TEST_PORT = 3261;
 const BASE_URL = `http://localhost:${TEST_PORT}`;
@@ -64,29 +67,76 @@ jest.mock('../../orchestrator', () => {
   return MockOrchestrator;
 });
 
+// ── Hilfsfunktion: Warten bis Port frei ist ──────────────────
+function waitForPortFree(port, retries = 10, delay = 500) {
+  return new Promise((resolve, reject) => {
+    let attempt = 0;
+    function check() {
+      const tester = http.createServer();
+      tester.once('error', (err) => {
+        if (err.code === 'EADDRINUSE' && attempt < retries) {
+          attempt++;
+          setTimeout(check, delay);
+        } else {
+          reject(err);
+        }
+      });
+      tester.once('listening', () => {
+        tester.close(() => resolve());
+      });
+      tester.listen(port);
+    }
+    check();
+  });
+}
+
+// ── Hilfsfunktion: Warten bis Server antwortet ───────────────
+function waitForServerReady(url, retries = 20, delay = 500) {
+  return new Promise((resolve, reject) => {
+    let attempt = 0;
+    function check() {
+      http.get(url, (res) => {
+        res.resume();
+        resolve();
+      }).on('error', () => {
+        if (attempt < retries) {
+          attempt++;
+          setTimeout(check, delay);
+        } else {
+          reject(new Error(`Server not ready after ${retries} attempts`));
+        }
+      });
+    }
+    check();
+  });
+}
+
 // ── Test Suite ────────────────────────────────────────────────
 
 let browser;
 let serverMod;
 
 beforeAll(async () => {
+  // Sicherstellen dass Port frei ist
+  await waitForPortFree(TEST_PORT);
+
   process.env.PORT = String(TEST_PORT);
   Object.keys(require.cache).forEach(key => {
     if (key.includes('server.js')) delete require.cache[key];
   });
   serverMod = require('../../server');
 
-  // Warten bis Server bereit ist
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  // Warten bis Server HTTP-Requests annimmt
+  await waitForServerReady(`http://localhost:${TEST_PORT}/health`);
 
   const { chromium } = require('playwright');
   browser = await chromium.launch({ headless: true });
-}, 30000);
+}, 60000);
 
 afterAll(async () => {
   if (browser) await browser.close();
   if (serverMod && serverMod.cleanup) await serverMod.cleanup();
-}, 15000);
+}, 30000);
 
 describe('E2E Keyboard Shortcut Tests', () => {
   let page;

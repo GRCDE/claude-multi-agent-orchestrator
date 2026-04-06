@@ -3,6 +3,9 @@
 
 'use strict';
 const path = require('path');
+const net = require('net');
+
+jest.setTimeout(60000);
 
 const TEST_PORT = 3262;
 const BASE_URL = `http://localhost:${TEST_PORT}`;
@@ -63,12 +66,38 @@ jest.mock('../../orchestrator', () => {
   return MockOrchestrator;
 });
 
+// ── Hilfsfunktion: Port freigeben falls belegt ──
+function waitForPort(port, maxRetries = 5) {
+  return new Promise((resolve, reject) => {
+    let attempt = 0;
+    function tryConnect() {
+      const tester = net.createServer();
+      tester.once('error', (err) => {
+        if (err.code === 'EADDRINUSE' && attempt < maxRetries) {
+          attempt++;
+          setTimeout(tryConnect, 1000);
+        } else {
+          reject(err);
+        }
+      });
+      tester.once('listening', () => {
+        tester.close(() => resolve());
+      });
+      tester.listen(port);
+    }
+    tryConnect();
+  });
+}
+
 // ── Test Suite ────────────────────────────────────────────────
 
 let browser;
 let serverMod;
 
 beforeAll(async () => {
+  // Sicherstellen dass der Port frei ist (EADDRINUSE Retry)
+  await waitForPort(TEST_PORT);
+
   process.env.PORT = String(TEST_PORT);
   Object.keys(require.cache).forEach(key => {
     if (key.includes('server.js')) delete require.cache[key];
@@ -80,7 +109,7 @@ beforeAll(async () => {
 
   const { chromium } = require('playwright');
   browser = await chromium.launch({ headless: true });
-}, 30000);
+}, 60000);
 
 afterAll(async () => {
   if (browser) await browser.close();

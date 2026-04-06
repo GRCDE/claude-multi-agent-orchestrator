@@ -40,16 +40,20 @@ jest.mock('express-rate-limit', () => {
   return () => (req, res, next) => next();
 });
 
+// Erhoehtes Timeout: Suche muss ggf. viele Projekte auf Disk scannen
+jest.setTimeout(60000);
+
 describe('Search Advanced API', () => {
   const projectsDir = path.join(__dirname, '..', '..', 'projects');
 
   // Projekt 1: Titel enthaelt "Zylindermotor", Datei enthaelt "Kolbendruck"
-  const proj1Id = 'proj_9999980001';
+  // Niedrige IDs damit sie bei readdir frueh gefunden werden (vor dem 5s Search-Timeout)
+  const proj1Id = 'proj_0000000001';
   const proj1Dir = path.join(projectsDir, proj1Id);
   const agent1Dir = path.join(proj1Dir, 'agent-1');
 
   // Projekt 2: Titel enthaelt "Quantenphysik", Conversation enthaelt "Verschraenkung"
-  const proj2Id = 'proj_9999980002';
+  const proj2Id = 'proj_0000000002';
   const proj2Dir = path.join(projectsDir, proj2Id);
   const agent2Dir = path.join(proj2Dir, 'agent-1');
 

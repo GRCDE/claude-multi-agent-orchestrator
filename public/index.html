@@ -981,6 +981,10 @@
     border-radius: var(--radius-sm); padding: 1rem; }
   .file-modal-body pre { margin: 0; white-space: pre-wrap; word-break: break-word;
     font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--txt); }
+  .file-modal-body pre[class*="language-"], .afv-file-preview-body pre[class*="language-"] {
+    background: transparent; margin: 0; padding: 0; border-radius: 0; }
+  .file-modal-body code[class*="language-"], .afv-file-preview-body code[class*="language-"] {
+    font-size: 12px; font-family: var(--mono); }
   .file-modal-binary { display: flex; align-items: center; justify-content: center;
     min-height: 120px; color: var(--txt3); font-size: 14px; }
 
@@ -1396,6 +1400,32 @@
     .template-grid { grid-template-columns: repeat(2, 1fr); }
     .filter-bar { flex-wrap: wrap; }
     .analytics-stats-grid { grid-template-columns: repeat(2, 1fr); }
+
+    /* Settings/Analytics/Perf-Modal: Viewport-angepasst */
+    .settings-modal { max-width: 580px; }
+    .modal { max-width: 680px; width: 96%; }
+    .compare-side-by-side { gap: 10px; }
+    .compare-modal { max-width: 96vw; }
+    .analytics-modal { max-width: 96vw; }
+    .perf-modal { max-width: 96vw; }
+    .log-viewer-panel { max-width: 96vw; }
+
+    /* Approval-Tasks: kompakter */
+    .approval-box { max-width: 90%; }
+    .approval-task { padding: 8px 10px; }
+
+    /* Top-Controls etwas enger */
+    .top-controls { gap: 4px; }
+    .top-btn { padding: 5px 8px; font-size: 15px; }
+
+    /* Global Search anpassen */
+    .global-search-wrap { max-width: calc(100vw - 300px); }
+
+    /* Queue-Elemente */
+    .queue-item-desc { font-size: 12px; }
+
+    /* Perf-Overview anpassen */
+    .perf-overview { grid-template-columns: repeat(2, 1fr); }
   }
 
   /* ── Mobile responsive (max-width: 768px) ───────────────── */
@@ -1483,6 +1513,55 @@
     .setup-title { font-size: 20px; }
     .proj-title { font-size: 16px; }
     .coord-name { font-size: 13px; }
+
+    /* Agent-Cards: volle Breite, kompakterer Inhalt */
+    .agent-card { border-radius: 10px; }
+    .card { width: 100%; box-sizing: border-box; }
+
+    /* Top-Controls: Flex-Wrap fuer viele Buttons */
+    .top-controls { flex-wrap: wrap; max-width: 280px; justify-content: flex-end; }
+
+    /* Settings-Modal: fast Full-Screen */
+    .settings-modal { max-width: 98vw; width: 98vw; max-height: 92vh; }
+    .settings-field label { font-size: 11px; }
+
+    /* Approval-Tasks: kompaktere Darstellung */
+    .approval-task { padding: 8px 10px; margin-bottom: 8px; }
+    .approval-task-header { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .approval-task-title { font-size: 12px; }
+    .approval-task textarea { min-height: 50px; font-size: 11px; }
+    .task-presets { gap: 3px; }
+    .task-preset-pill { font-size: 10px; padding: 2px 6px; }
+
+    /* Compare-Side-by-Side: Single-Column */
+    .compare-side-by-side { grid-template-columns: 1fr; gap: 10px; }
+    .compare-select-row { flex-direction: column; gap: 8px; }
+    .compare-select-row select { min-width: 100%; }
+
+    /* Log-Toolbar: besser stacken */
+    .log-toolbar { gap: 4px; }
+    .log-search-input { width: 100%; }
+    .log-filter-group { flex-wrap: wrap; }
+
+    /* Perf-Modal anpassen */
+    .perf-modal { max-width: 98vw; }
+    .perf-grid { grid-template-columns: repeat(2, 1fr); }
+    .perf-table .ep-name { max-width: 140px; }
+
+    /* File-Modal: breiter */
+    .file-modal { max-width: 98vw; width: 98vw; }
+    .file-modal-header { flex-direction: column; gap: 6px; }
+
+    /* Milestone-Grid anpassen */
+    .milestone-task-row { flex-direction: column; }
+    .milestone-task-row .task-num { min-width: auto; padding-top: 0; }
+    .milestone-actions { flex-direction: column; }
+
+    /* Diff-Scores */
+    .diff-scores { grid-template-columns: 1fr; }
+
+    /* Score-Bars Label schmaler */
+    .afv-score-bar-label { flex: 0 0 70px; font-size: 11px; }
   }
 
   /* ── Kleines Mobile (<480px) ──────────────────────────────── */
@@ -1548,6 +1627,104 @@
     .section-label { font-size: 9px; }
     label { font-size: 12px; }
     textarea { font-size: 14px; } /* groesser fuer bessere Lesbarkeit auf kleinen Screens */
+
+    /* Header: kompakter */
+    .proj-header { gap: 0.5rem; }
+    .stats-row { font-size: 11px; gap: 6px; }
+    .conn-badge { bottom: 8px; right: 8px; font-size: 9px; padding: 2px 7px; }
+
+    /* Top-Controls: noch kompakter, 2 Zeilen */
+    .top-controls { max-width: 200px; flex-wrap: wrap; gap: 2px; }
+    .top-btn { min-width: 36px; min-height: 36px; font-size: 13px; padding: 6px; }
+
+    /* Modal: echtes Fullscreen */
+    .modal-overlay { align-items: stretch; padding: 0; }
+    .modal { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; padding: 0.75rem; margin: 0; }
+    .modal-close { top: 8px; right: 8px; }
+
+    /* Settings-Modal: Fullscreen */
+    .settings-modal { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
+    .settings-modal h3 { font-size: 14px; }
+    .settings-field input[type=number], .settings-field input[type=text] { font-size: 12px; padding: 6px 8px; }
+
+    /* Approval-Tasks: maximale Kompaktheit */
+    .approval-box { margin: 0.5rem auto; padding: 0; }
+    .approval-title { font-size: 15px; }
+    .approval-summary { font-size: 12px; margin-bottom: 0.75rem; }
+    .approval-task { padding: 6px 8px; margin-bottom: 6px; }
+    .approval-task-header { flex-direction: column; align-items: flex-start; gap: 1px; margin-bottom: 4px; }
+    .approval-task-title { font-size: 11px; }
+    .approval-task-num { font-size: 10px; }
+    .approval-task textarea { min-height: 40px; font-size: 11px; }
+    .task-presets { gap: 2px; }
+    .task-preset-pill { font-size: 9px; padding: 1px 5px; }
+
+    /* Agent-Cards: maximale Kompaktheit */
+    .agent-card { border-radius: 8px; }
+    .agent-conv { max-height: 120px; }
+
+    /* Compare/Diff: Single-Column */
+    .compare-side-by-side { grid-template-columns: 1fr; }
+    .compare-modal { max-width: 100vw; width: 100vw; border-radius: 0; }
+    .compare-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .compare-tab { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+
+    /* Log-Viewer: Fullscreen */
+    .log-viewer-panel { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; padding: 0.75rem; }
+    .log-toolbar { flex-direction: column; gap: 4px; }
+    .log-filter-group { width: 100%; flex-wrap: wrap; }
+    .log-search-input { width: 100%; }
+    .log-viewer-header { flex-direction: column; gap: 6px; align-items: flex-start; }
+    .log-viewer-title { font-size: 13px; }
+
+    /* Perf-Modal: Fullscreen */
+    .perf-modal { max-width: 100vw; width: 100vw; border-radius: 0; }
+    .perf-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .perf-card-value { font-size: 18px; }
+    .perf-card-label { font-size: 9px; }
+    .perf-table { font-size: 10px; }
+    .perf-table th, .perf-table td { padding: 4px 5px; }
+    .perf-table .ep-name { max-width: 100px; font-size: 10px; }
+
+    /* Analytics: Fullscreen */
+    .analytics-modal { max-width: 100vw; width: 100vw; border-radius: 0; }
+    .analytics-stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+
+    /* File-Modal: Fullscreen */
+    .file-modal { padding: 0.75rem; }
+    .file-modal-path { font-size: 11px; }
+    .file-modal-body pre { font-size: 11px; }
+
+    /* Queue kompakter */
+    .queue-item { padding: 8px 10px; gap: 6px; }
+    .queue-item-desc { font-size: 12px; }
+    .queue-item-meta { font-size: 10px; }
+
+    /* Global Search: minimal */
+    .global-search-wrap { width: 140px; max-width: calc(100vw - 120px); top: 8px; }
+    .global-search-input { font-size: 11px; padding: 6px 10px 6px 26px; }
+    .global-search-icon { font-size: 11px; left: 8px; }
+    .global-search-kbd { display: none; }
+
+    /* Milestone-Editor kompakter */
+    .milestone-task-row { padding: 6px 8px; }
+    .milestone-task-row input, .milestone-task-row textarea { font-size: 11px; padding: 4px 6px; }
+    .milestone-title { font-size: 12px; }
+
+    /* Token-Panel kompakter */
+    .token-panel-header { padding: 6px 10px; font-size: 12px; }
+
+    /* Activity-Feed kompakter */
+    .activity-ts { font-size: 9px; min-width: 45px; }
+    .activity-text { font-size: 11px; }
+    .activity-feed-title { font-size: 11px; }
+
+    /* Prompt-Studio */
+    .prompt-section-header h4 { font-size: 12px; }
+
+    /* Merge-Stats */
+    .merge-stats { gap: 6px; }
+    .merge-stat { padding: 4px 8px; font-size: 11px; }
   }
 
   /* ── Log-Viewer (erweitert) ──────────────────────────────── */
@@ -2423,6 +2600,17 @@
     .perf-history-table th, .perf-history-table td { padding: 4px 5px; }
   }
 </style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+<script>window.Prism = window.Prism || {}; Prism.manual = true;</script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markup.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-css.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markdown.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
 </head>
 <body>
 <div class="conn-bar" id="connBar" role="status" aria-live="assertive"></div>
@@ -2431,6 +2619,7 @@
   <button class="top-btn" id="settingsToggle" onclick="openSettings()" title="Einstellungen" aria-label="Einstellungen"><span aria-hidden="true">&#9881;</span><span class="sr-only">Einstellungen</span></button>
   <button class="top-btn" id="dndToggle" onclick="toggleDoNotDisturb()" title="Nicht st&ouml;ren" aria-label="Nicht st&ouml;ren Modus umschalten"></button>
   <button class="top-btn" id="soundToggle" onclick="toggleSound()" title="Benachrichtigungston ein/aus" aria-label="Benachrichtigungston ein/aus"></button>
+  <button class="top-btn" id="notifToggle" onclick="toggleNotifications()" title="Desktop-Benachrichtigungen ein/aus" aria-label="Desktop-Benachrichtigungen ein/aus"></button>
   <button class="top-btn" id="themeToggle" onclick="toggleDarkMode()" title="Dark/Light Mode" aria-label="Dark/Light Mode umschalten"></button>
   <button class="top-btn" id="activityToggle" onclick="toggleActivityFeed()" title="Aktivit&auml;ten (A)" aria-label="Aktivit&auml;ten ein/aus">&#9776;</button>
   <button class="top-btn" id="analyticsToggle" onclick="openAnalytics()" title="Analytics (N)" aria-label="Analytics Dashboard">&#128202;</button>
@@ -2687,6 +2876,21 @@ function toggleSound() {
   if (soundEnabled) requestNotificationPermission();
 }
 
+function toggleNotifications() {
+  notificationsEnabled = !notificationsEnabled;
+  localStorage.setItem('notificationsEnabled', String(notificationsEnabled));
+  applyNotifToggle();
+  if (notificationsEnabled) requestNotificationPermission();
+}
+
+function applyNotifToggle() {
+  var _nEl = document.getElementById('notifToggle');
+  if (!_nEl) return;
+  _nEl.setAttribute('aria-label', notificationsEnabled ? 'Desktop-Benachrichtigungen ausschalten' : 'Desktop-Benachrichtigungen einschalten');
+  _nEl.textContent = notificationsEnabled ? '\uD83D\uDCEC' : '\uD83D\uDCED';
+  _nEl.title = notificationsEnabled ? 'Desktop-Benachrichtigungen aktiv \u2013 klicken zum Deaktivieren' : 'Desktop-Benachrichtigungen einschalten';
+}
+
 function toggleDoNotDisturb() {
   doNotDisturb = !doNotDisturb;
   applyDndToggle();
@@ -2759,6 +2963,7 @@ function playQuestionPing() {
 }
 
 applySoundToggle();
+applyNotifToggle();
 applyDndToggle();
 
 // ── Browser Notifications (Notification API) ─────────────────
@@ -2945,6 +3150,9 @@ registerEventHandler('agent', function(d) {
       if (agent.status === 'error') {
         showNotification('Agent ' + (idx + 1) + ' fehlgeschlagen', agentTitle ? agentLabel + ': ' + agentTitle : agentLabel + ' ist fehlgeschlagen.');
         playErrorBeep();
+      }
+      if (agent.status === 'done') {
+        showNotification('Agent ' + (idx + 1) + ' fertig', agentTitle ? agentLabel + ': ' + agentTitle + ' abgeschlossen.' : agentLabel + ' ist fertig.');
       }
       if (agent.status === 'asking') {
         showNotification('Agent ' + (idx + 1) + ' braucht Hilfe', agentLabel + ' hat eine Frage an den Koordinator.');
@@ -3179,6 +3387,7 @@ registerEventHandler('merge-complete', function(d) {
 registerEventHandler('budget_warning', function(d) {
     if (d && d.message) {
       addBanner('warn', d.message);
+      showNotification('Budget-Warnung', d.message);
     }
     if (state.budget) { state.budget.warned = true; }
     updateBudgetDisplay();
@@ -3187,6 +3396,7 @@ registerEventHandler('budget_warning', function(d) {
 registerEventHandler('budget_exceeded', function(d) {
     if (d && d.message) {
       addBanner('error', d.message);
+      showNotification('Budget \u00FCberschritten', d.message);
     }
     if (state.budget) { state.budget.exceeded = true; }
     updateBudgetDisplay();
@@ -3922,7 +4132,7 @@ function renderSetup() {
 
   return renderRecoveryBanner() +
     '<div class="card setup-box">' +
-    '<div class="setup-title">Agent Orchestrator</div>' +
+    '<h1 class="setup-title">Agent Orchestrator</h1>' +
     '<div class="setup-sub">Der Koordinator plant das Projekt und weist Claude Code Agenten Aufgaben zu.<br>' +
     'Agenten k\u00F6nnen R\u00FCckfragen stellen \u2013 der Koordinator antwortet. Alle Outputs landen als echte Dateien auf deiner Festplatte.</div>' +
     tplHtml +
@@ -5556,7 +5766,9 @@ function afvLoadFileContent(itemEl, filePath) {
     if (data.binary) {
       bodyHtml = '<div style="padding:2rem;text-align:center;color:var(--txt3)">Bin\u00E4rdatei (' + formatFileSize(data.size) + ')</div>';
     } else {
-      bodyHtml = '<pre>' + esc(data.content || '') + '</pre>';
+      var lang = getPrismLanguage(data.path || filePath);
+      var langClass = lang ? ' class="language-' + lang + '"' : '';
+      bodyHtml = '<pre' + langClass + '><code' + langClass + '>' + esc(data.content || '') + '</code></pre>';
     }
     previewEl.innerHTML = '<div class="afv-file-preview">' +
       '<div class="afv-file-preview-header">' +
@@ -5568,6 +5780,7 @@ function afvLoadFileContent(itemEl, filePath) {
       '</div>' +
       '<div class="afv-file-preview-body" id="afvFileContentBody">' + bodyHtml + '</div>' +
     '</div>';
+    if (lang && typeof Prism !== 'undefined') Prism.highlightAll();
   }).catch(function(err) {
     if (previewEl) {
       previewEl.innerHTML = '<div class="afv-file-preview"><div class="afv-file-preview-body"><pre style="color:var(--red)">Fehler: ' + esc(err.message || '') + '</pre></div></div>';
@@ -6752,7 +6965,7 @@ function renderHistoryFilters() {
   });
   html += '</div>';
   html += '<div class="history-filter-group"><label>Sortierung:</label>' +
-    '<select class="history-sort-select" onchange="setHistorySort(this.value)">' +
+    '<select class="history-sort-select" aria-label="Sortierung" onchange="setHistorySort(this.value)">' +
     '<option value="datum-desc"' + (historySort === 'datum-desc' ? ' selected' : '') + '>Datum (neu)</option>' +
     '<option value="datum-asc"' + (historySort === 'datum-asc' ? ' selected' : '') + '>Datum (alt)</option>' +
     '<option value="score-desc"' + (historySort === 'score-desc' ? ' selected' : '') + '>Score (hoch)</option>' +
@@ -8427,6 +8640,12 @@ function buildFileItem(filePath, size, agentColor) {
 
 
 // ── File Content Viewer ──────────────────────────────────────────────
+function getPrismLanguage(filePath) {
+  var ext = (filePath || '').split('.').pop().toLowerCase();
+  var map = { js: 'javascript', mjs: 'javascript', cjs: 'javascript', ts: 'typescript', tsx: 'typescript', py: 'python', json: 'json', jsonl: 'json', html: 'markup', htm: 'markup', xml: 'markup', svg: 'markup', css: 'css', scss: 'css', md: 'markdown', sh: 'bash', bash: 'bash', zsh: 'bash', bat: 'bash' };
+  return map[ext] || '';
+}
+
 function openFileContent(filePath) {
   var id = getProjectId();
   if (!id) return;
@@ -8469,12 +8688,15 @@ function openFileContent(filePath) {
       bodyHtml = '<div class="file-modal-binary">Bin\u00E4rdatei (' + esc(sizeText) + ')</div>';
     } else {
       headerHtml += '<div class="file-modal-actions"><button class="file-modal-copy" onclick="copyFileContent()" title="Inhalt kopieren">Kopieren</button></div>';
-      bodyHtml = '<pre><code id="fileContentCode">' + esc(data.content) + '</code></pre>';
+      var lang = getPrismLanguage(data.path || filePath);
+      var langClass = lang ? ' class="language-' + lang + '"' : '';
+      bodyHtml = '<pre' + langClass + '><code id="fileContentCode"' + langClass + '>' + esc(data.content) + '</code></pre>';
     }
 
     modal.innerHTML = '<button class="modal-close" aria-label="Dialog schlie\u00DFen" onclick="closeFileModal()" title="Schlie\u00DFen">\u00D7</button>' +
       '<div class="file-modal-header">' + headerHtml + '</div>' +
       '<div class="file-modal-body">' + bodyHtml + '</div>';
+    if (lang && typeof Prism !== 'undefined') Prism.highlightAll();
   }).catch(function(err) {
     var modal = document.querySelector('#fileModal .modal');
     if (!modal) return;
