@@ -134,6 +134,8 @@
   .agent-card.done    { border-color: #5DCAA5; }
   .agent-card.error   { border-color: #F09595; box-shadow: 0 0 0 1px #F0959533; }
   .agent-card.retrying { border-color: #EF9F27; box-shadow: 0 0 0 1px #EF9F2733; }
+  .agent-progress { height: 3px; background: var(--bg3); border-radius: 2px; overflow: hidden; margin: 4px 0; }
+  .agent-progress-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.5s ease; }
   .agent-num { font-size: 11px; color: var(--txt2); font-weight: 500; }
   .agent-role { font-size: 10px; color: var(--txt3); background: var(--bg2); border-radius: 4px; padding: 1px 6px; display: inline-block; margin-top: 2px; }
   .agent-title { font-size: 13px; font-weight: 600; margin-top: 1px; }
@@ -224,6 +226,10 @@
     font-size: 14px; padding: 2px 6px; border-radius: 4px; transition: all var(--transition);
     flex-shrink: 0; line-height: 1; }
   .history-delete:hover { background: var(--red-bg); color: var(--red); }
+  .history-clone { background: none; border: none; color: var(--txt3); cursor: pointer;
+    font-size: 14px; padding: 2px 6px; border-radius: 4px; transition: all var(--transition);
+    flex-shrink: 0; line-height: 1; }
+  .history-clone:hover { background: var(--blue-bg); color: var(--blue); }
   .history-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
   .history-actions .btn-sm { font-size: 12px; padding: 5px 12px; border-radius: 6px;
     border: 0.5px solid var(--border); background: var(--bg2); color: var(--txt2);
@@ -396,6 +402,41 @@
     font-size: 11px; color: var(--txt3); text-align: center; margin-top: 12px;
   }
 
+  /* ── Compare modal ─────────────────────────────────────── */
+  .compare-modal { max-width: 860px; }
+  .compare-modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 1rem; }
+  .compare-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .compare-col { display: flex; flex-direction: column; gap: 8px; }
+  .compare-col-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .compare-stat { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 13px; }
+  .compare-stat-label { color: var(--txt2); }
+  .compare-stat-value { font-weight: 600; font-family: var(--mono); font-size: 12px; }
+  .compare-agents-title { font-size: 12px; font-weight: 600; color: var(--txt2); margin-top: 8px; margin-bottom: 4px; }
+  .compare-agent-row { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 0; }
+  .compare-agent-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .compare-check { margin-right: 6px; cursor: pointer; accent-color: var(--blue); }
+  .compare-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .compare-start-btn { padding: 5px 14px; font-size: 12px; border-radius: 6px;
+    border: none; background: var(--blue-bg); color: var(--blue);
+    cursor: pointer; font-weight: 500; transition: opacity var(--transition); }
+  .compare-start-btn:hover { opacity: 0.8; }
+  .compare-start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .compare-cancel-btn { padding: 5px 14px; font-size: 12px; border-radius: 6px;
+    border: 0.5px solid var(--border); background: var(--bg2); color: var(--txt2);
+    cursor: pointer; transition: all var(--transition); }
+  .compare-cancel-btn:hover { background: var(--bg3); }
+  .compare-hint { font-size: 11px; color: var(--txt3); margin-left: 8px; }
+  @media (max-width: 600px) {
+    .compare-layout { grid-template-columns: 1fr; }
+  }
+
+  /* ── Tablet responsive (768px–1024px) ─────────────────── */
+  @media (max-width: 1024px) and (min-width: 769px) {
+    .agent-grid { grid-template-columns: repeat(2, 1fr); }
+    .template-grid { grid-template-columns: repeat(2, 1fr); }
+    .filter-bar { flex-wrap: wrap; }
+  }
+
   /* ── Mobile responsive ─────────────────────────────────── */
   @media (max-width: 768px) {
     #app { padding: 1rem; }
@@ -407,6 +448,29 @@
     .stats-row { width: 100%; text-align: left; }
     .top-controls { top: 8px; right: 8px; }
     .top-btn { padding: 4px 8px; font-size: 14px; }
+  }
+
+  /* ── Small mobile (<480px) ──────────────────────────────── */
+  @media (max-width: 480px) {
+    #app { padding: 0.75rem; }
+    body { font-size: 13px; }
+    .card { padding: 1rem; }
+    .agent-grid { grid-template-columns: 1fr; }
+    .template-grid { grid-template-columns: 1fr; }
+    .modal { max-width: 95vw; max-height: 95vh; padding: 1rem; }
+    .setup-title { font-size: 20px; }
+    .proj-title { font-size: 16px; }
+    .complete-banner { flex-wrap: wrap; }
+  }
+
+  /* ── Druckansicht ───────────────────────────────────────── */
+  @media print {
+    .theme-toggle, .top-controls, .conn-bar, .btn-primary, .btn-outline, .btn-retry,
+    .filter-bar, .shortcuts-hint, #historyArea, .btn-print { display: none !important; }
+    body { background: white; color: black; font-size: 12px; }
+    .card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+    .agent-conv { max-height: none; overflow: visible; }
+    .bubble { page-break-inside: avoid; }
   }
 </style>
 </head>
@@ -446,6 +510,8 @@ let selectedTemplateId = null;
 let allDetailsExpanded = false;
 let agentFilter = 'alle'; // 'alle' | 'aktiv' | 'fertig' | 'fehler'
 let agentSearch = '';
+let compareMode = false;
+let compareSelected = []; // array of project IDs (max 2)
 
 // ── Dark Mode ────────────────────────────────────────────────
 let darkMode = localStorage.getItem('darkMode') !== 'false' &&
@@ -1110,7 +1176,8 @@ function renderDashboard() {
   var coord = state.coordinator || {};
   var done = agents.filter(function(a) { return a.status === 'done'; }).length;
   var total = agents.length;
-  var pct = total > 0 ? Math.round(done / total * 100) : 0;
+  var avgProgress = total > 0 ? Math.round(agents.reduce(function(sum, a) { return sum + (a.progress || 0); }, 0) / total) : 0;
+  var pct = avgProgress;
   var totalQ = (coord.log || []).length;
   var isComplete = state.phase === 'complete';
   var isPartial = state.phase === 'partial';
@@ -1132,7 +1199,9 @@ function renderDashboard() {
         (state.projectDir ? '<div class="complete-path">' + esc(state.projectDir) + '</div>' : '') +
       '</div>' +
       '<button class="btn-outline" onclick="exportProject()">ZIP Export</button> ' +
+      '<button class="btn-outline btn-print" onclick="window.print()">Drucken</button> ' +
       '<button class="btn-outline" onclick="loadMergedFiles()">Zusammengef\u00FChrte Dateien</button> ' +
+      '<button class="btn-outline" onclick="cloneProject()">Erneut starten</button> ' +
       '<button class="btn-outline" onclick="resetProject()">Neues Projekt</button>' +
     '</div>';
 
@@ -1172,6 +1241,7 @@ function renderDashboard() {
       '</div>' +
       '<button class="btn-outline" onclick="exportProject()">ZIP Export</button> ' +
       '<button class="btn-outline" onclick="loadMergedFiles()">Zusammengef\u00FChrte Dateien</button> ' +
+      '<button class="btn-outline" onclick="cloneProject()">Erneut starten</button> ' +
       '<button class="btn-outline" onclick="resetProject()">Neues Projekt</button>' +
     '</div>';
 
@@ -1455,6 +1525,7 @@ function renderAgent(agent, idx) {
       '</div>' +
       '<span class="agent-badge">' + badge(agent.status || 'waiting') + '</span>' +
     '</div>' +
+    ((agent.status === 'working' || agent.status === 'asking' || agent.status === 'retrying') ? '<div class="agent-progress"><div class="agent-progress-fill" style="width:' + (agent.progress || 0) + '%"></div></div>' : '') +
     (agent.task ? '<div class="agent-task">' + esc(truncate(agent.task, 90)) + '</div>' : '') +
     '<div class="agent-conv"' + (allDetailsExpanded ? ' style="max-height:none"' : '') + '>' + bubbles + '</div>' +
     '<div class="agent-foot"><span>' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (agent.duration != null ? ' \u00B7 ' + formatDuration(agent.duration) : '')) + '</span><span>' + retryBtn + ' <a class="details-link" onclick="openAgentModal(' + idx + ')">Details</a></span></div>' +
@@ -1536,19 +1607,143 @@ function renderHistory() {
     loadDiskUsage();
     return;
   }
-  var html = '<div class="section-label">Bisherige Projekte</div>';
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center">' +
+    '<div class="section-label" style="margin-bottom:0">Bisherige Projekte</div>';
+  if (projectHistory.length >= 2) {
+    if (compareMode) {
+      html += '<div class="compare-actions">' +
+        '<button class="compare-start-btn" onclick="startComparison()"' + (compareSelected.length !== 2 ? ' disabled' : '') + '>Vergleich starten</button>' +
+        '<button class="compare-cancel-btn" onclick="toggleCompareMode()">Abbrechen</button>' +
+        '<span class="compare-hint">' + esc(compareSelected.length + ' von 2 ausgew\u00E4hlt') + '</span>' +
+      '</div>';
+    } else {
+      html += '<button class="btn-sm" onclick="toggleCompareMode()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:0.5px solid var(--border);background:var(--bg2);color:var(--txt2);cursor:pointer">Vergleichen</button>';
+    }
+  }
+  html += '</div>';
   projectHistory.forEach(function(p) {
     var pid = esc(p.id || p);
-    html += '<div class="history-item">' +
-      '<span class="history-title" onclick="loadProject(\'' + pid + '\')">' + esc(p.title || p.id || p) + (p.totalDuration ? ' (' + formatDuration(p.totalDuration) + ')' : '') + '</span>' +
+    var isChecked = compareSelected.indexOf(pid) !== -1;
+    html += '<div class="history-item">';
+    if (compareMode) {
+      html += '<input type="checkbox" class="compare-check"' + (isChecked ? ' checked' : '') + ' onclick="event.stopPropagation();toggleCompareSelect(\'' + pid + '\')"' + (!isChecked && compareSelected.length >= 2 ? ' disabled' : '') + '>';
+    }
+    html += '<span class="history-title" onclick="loadProject(\'' + pid + '\')">' + esc(p.title || p.id || p) + (p.totalDuration ? ' (' + formatDuration(p.totalDuration) + ')' : '') + '</span>' +
       '<span class="history-id">' + pid + '</span>' +
-      '<button class="history-delete" onclick="event.stopPropagation();deleteProject(\'' + pid + '\')" title="Projekt löschen">✕</button>' +
+      '<button class="history-clone" onclick="event.stopPropagation();cloneProject(\'' + pid + '\')" title="Projekt wiederholen">\u21BB</button>' +
+      '<button class="history-delete" onclick="event.stopPropagation();deleteProject(\'' + pid + '\')" title="Projekt l\u00F6schen">\u2715</button>' +
     '</div>';
   });
-  html += '<div class="history-actions"><button class="btn-sm" onclick="cleanupProjects()">Alte Projekte aufräumen</button></div>';
+  html += '<div class="history-actions"><button class="btn-sm" onclick="cleanupProjects()">Alte Projekte aufr\u00E4umen</button></div>';
   html += '<div class="disk-usage" id="diskUsageInfo"></div>';
   area.innerHTML = html;
   loadDiskUsage();
+}
+
+function toggleCompareMode() {
+  compareMode = !compareMode;
+  compareSelected = [];
+  renderHistory();
+}
+
+function toggleCompareSelect(pid) {
+  var idx = compareSelected.indexOf(pid);
+  if (idx !== -1) {
+    compareSelected.splice(idx, 1);
+  } else if (compareSelected.length < 2) {
+    compareSelected.push(pid);
+  }
+  renderHistory();
+}
+
+async function startComparison() {
+  if (compareSelected.length !== 2) return;
+  try {
+    var responses = await Promise.all([
+      fetch('/api/projects/' + encodeURIComponent(compareSelected[0])).then(function(r) { if (!r.ok) throw new Error('Projekt nicht gefunden'); return r.json(); }),
+      fetch('/api/projects/' + encodeURIComponent(compareSelected[1])).then(function(r) { if (!r.ok) throw new Error('Projekt nicht gefunden'); return r.json(); })
+    ]);
+    openCompareModal(responses[0], responses[1]);
+  } catch (e) {
+    addBanner('error', 'Vergleich fehlgeschlagen: ' + e.message);
+  }
+}
+
+function extractCompareStats(proj) {
+  var agents = proj.agents || [];
+  var totalRounds = agents.reduce(function(s, a) { return s + (a.rounds || 0); }, 0);
+  var totalQuestions = agents.reduce(function(s, a) { return s + (a.questions || 0); }, 0);
+  var doneCount = agents.filter(function(a) { return a.status === 'done'; }).length;
+  var errorCount = agents.filter(function(a) { return a.status === 'error'; }).length;
+  return {
+    title: proj.projectTitle || proj.id || '(Unbenannt)',
+    phase: proj.phase || 'unbekannt',
+    agentCount: agents.length,
+    doneCount: doneCount,
+    errorCount: errorCount,
+    totalRounds: totalRounds,
+    totalQuestions: totalQuestions,
+    duration: proj.totalDuration,
+    agents: agents
+  };
+}
+
+function renderCompareCol(stats) {
+  var html = '<div class="compare-col">' +
+    '<div class="compare-col-title">' + esc(stats.title) + '</div>' +
+    '<div class="compare-stat"><span class="compare-stat-label">Status</span><span class="compare-stat-value">' + badge(stats.phase) + '</span></div>' +
+    '<div class="compare-stat"><span class="compare-stat-label">Agenten</span><span class="compare-stat-value">' + esc(String(stats.agentCount)) + '</span></div>' +
+    '<div class="compare-stat"><span class="compare-stat-label">Erfolgreich</span><span class="compare-stat-value">' + esc(String(stats.doneCount)) + '</span></div>' +
+    '<div class="compare-stat"><span class="compare-stat-label">Fehlgeschlagen</span><span class="compare-stat-value">' + esc(String(stats.errorCount)) + '</span></div>' +
+    '<div class="compare-stat"><span class="compare-stat-label">Runden gesamt</span><span class="compare-stat-value">' + esc(String(stats.totalRounds)) + '</span></div>' +
+    '<div class="compare-stat"><span class="compare-stat-label">Fragen gesamt</span><span class="compare-stat-value">' + esc(String(stats.totalQuestions)) + '</span></div>' +
+    '<div class="compare-stat"><span class="compare-stat-label">Dauer</span><span class="compare-stat-value">' + esc(stats.duration != null ? formatDuration(stats.duration) : '\u2014') + '</span></div>';
+
+  if (stats.agents.length > 0) {
+    html += '<div class="compare-agents-title">Agenten</div>';
+    stats.agents.forEach(function(a, i) {
+      html += '<div class="compare-agent-row">' +
+        '<span style="color:var(--txt3);font-size:11px;min-width:18px">A' + (i + 1) + '</span>' +
+        '<span class="compare-agent-name">' + esc(a.title || '\u2014') + '</span>' +
+        badge(a.status || 'waiting') +
+      '</div>';
+    });
+  }
+  html += '</div>';
+  return html;
+}
+
+function openCompareModal(proj1, proj2) {
+  closeCompareModal();
+  var stats1 = extractCompareStats(proj1);
+  var stats2 = extractCompareStats(proj2);
+
+  var overlay = document.createElement('div');
+  overlay.id = 'compareModal';
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) closeCompareModal(); };
+
+  overlay.innerHTML = '<div class="modal compare-modal">' +
+    '<button class="modal-close" onclick="closeCompareModal()" title="Schlie\u00DFen">\u00D7</button>' +
+    '<h3>Projektvergleich</h3>' +
+    '<div class="compare-layout">' +
+      renderCompareCol(stats1) +
+      renderCompareCol(stats2) +
+    '</div>' +
+  '</div>';
+
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', compareModalKeyHandler);
+}
+
+function closeCompareModal() {
+  var el = document.getElementById('compareModal');
+  if (el) el.remove();
+  document.removeEventListener('keydown', compareModalKeyHandler);
+}
+
+function compareModalKeyHandler(e) {
+  if (e.key === 'Escape') closeCompareModal();
 }
 
 function deleteProject(id) {
@@ -1663,10 +1858,61 @@ async function resetProject() {
   };
   banners = [];
   mergedFiles = null;
+  compareMode = false;
+  compareSelected = [];
   fileTreeOpen = false;
   fileGroupState = {};
   stopFileTreePolling();
   render();
+}
+
+async function cloneProject(projectId) {
+  // Projekt-ID ermitteln: entweder als Parameter oder aus aktuellem State
+  var id = projectId;
+  if (!id) {
+    var dir = state.projectDir || '';
+    id = dir.split('/').pop() || dir.split('\').pop() || '';
+  }
+  if (!id || !id.startsWith('proj_')) {
+    addBanner('error', 'Keine gültige Projekt-ID gefunden.');
+    return;
+  }
+  try {
+    var r = await fetch('/api/clone/' + encodeURIComponent(id), { method: 'POST' });
+    if (!r.ok) {
+      var err = await r.json();
+      throw new Error(err.error || 'Fehler beim Klonen');
+    }
+    var data = await r.json();
+    // Reset auf Setup-Ansicht
+    await fetch('/api/reset', { method: 'POST' });
+    state = {
+      phase: 'setup', projectTitle: '', projectSummary: '', projectDir: '',
+      coordinator: { status: 'idle', summary: '', activeQuestion: null, log: [] },
+      agents: [], startedAt: null, completedAt: null, totalDuration: null
+    };
+    banners = [];
+    mergedFiles = null;
+    fileTreeOpen = false;
+    fileGroupState = {};
+    stopFileTreePolling();
+    render();
+    // Formular vorausfüllen
+    var descEl = document.getElementById('desc');
+    if (descEl && data.description) {
+      descEl.value = data.description;
+    }
+    var sliderEl = document.getElementById('countSlider');
+    var displayEl = document.getElementById('countDisplay');
+    if (sliderEl && data.agentCount) {
+      var count = Math.min(Math.max(2, data.agentCount), 10);
+      sliderEl.value = count;
+      if (displayEl) displayEl.textContent = count;
+    }
+    addBanner('success', 'Projekteinstellungen geladen. Du kannst sie anpassen und neu starten.');
+  } catch (e) {
+    addBanner('error', 'Klonen fehlgeschlagen: ' + e.message);
+  }
 }
 
 function exportProject() {

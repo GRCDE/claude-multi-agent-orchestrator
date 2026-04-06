@@ -516,6 +516,30 @@ app.post('/api/retry/:agentIndex', apiLimiter, async (req, res) => {
   orchestrator.retryAgent(idx).catch(e => broadcast('error', { message: e.message }));
 });
 
+// ── Projekt klonen (Einstellungen übernehmen) ────────────────
+app.post('/api/clone/:id', apiLimiter, (req, res) => {
+  const id = req.params.id;
+  if (!id || !id.startsWith('proj_')) {
+    return res.status(400).json({ error: 'Ungültige Projekt-ID' });
+  }
+  const stateFile = path.join(__dirname, 'projects', id, 'state.json');
+  // Pfad-Traversal verhindern
+  if (!stateFile.startsWith(path.join(__dirname, 'projects'))) {
+    return res.status(400).json({ error: 'Ungültiger Pfad' });
+  }
+  try {
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    const description = state.projectDesc || state.projectSummary || '';
+    const agentCount = (state.agents || []).length || 3;
+    const tasks = (state.tasks || []).map(function(t) {
+      return { title: t.title || '', task: t.task || '', deliverable: t.deliverable || '' };
+    });
+    res.json({ ok: true, description: description, agentCount: agentCount, tasks: tasks });
+  } catch {
+    res.status(404).json({ error: 'Projekt nicht gefunden oder state.json fehlt' });
+  }
+});
+
 // ── Server starten ───────────────────────────────────────────
 const server = app.listen(PORT, () => {
   console.log('');

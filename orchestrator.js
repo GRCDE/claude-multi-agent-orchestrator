@@ -462,6 +462,7 @@ class Orchestrator extends EventEmitter {
       projectId: this.projectId,
       projectTitle: this.projectTitle,
       projectSummary: this.projectSummary,
+      projectDesc: this.projectDesc || '',
       tasks: this.tasks,
       coordinator: {
         status: this.coordStatus,
@@ -524,7 +525,7 @@ class Orchestrator extends EventEmitter {
     this.agents = tasks.map((task, i) => ({
       id: i, title: task.title, task: task.task, deliverable: task.deliverable,
       role: task.role || '', depends_on: task.depends_on || [],
-      status: 'waiting', conversation: [], rounds: 0,
+      status: 'waiting', progress: 0, conversation: [], rounds: 0,
       questions: 0, startTime: null, endTime: null, duration: null,
       workDir: path.join(this.projectDir, `agent-${i + 1}`)
     }));
@@ -585,7 +586,7 @@ class Orchestrator extends EventEmitter {
     this.totalDuration = null;
     this.agents = Array.from({ length: clampedCount }, (_, i) => ({
       id: i, title: 'Wird geplant…', task: '', deliverable: '', role: '',
-      status: 'waiting', conversation: [], rounds: 0, questions: 0,
+      status: 'waiting', progress: 0, conversation: [], rounds: 0, questions: 0,
       startTime: null, endTime: null, duration: null,
       workDir: path.join(this.projectDir, `agent-${i + 1}`)
     }));
@@ -691,6 +692,7 @@ class Orchestrator extends EventEmitter {
                 this.agents[i].conversation = [];
                 this.agents[i].rounds = 0;
                 this.agents[i].questions = 0;
+                this.agents[i].progress = 0;
                 this.agents[i].startTime = null;
                 this.agents[i].endTime = null;
                 this.agents[i].duration = null;
@@ -857,7 +859,7 @@ Projekt: ${this.projectDesc}`;
 
     validateWorkDir(agentDir);
     logger.info('Agent gestartet', { agent: agentNum, task: task.title });
-    this._patchAgent(idx, { status: 'working', startTime: Date.now() });
+    this._patchAgent(idx, { status: 'working', progress: 10, startTime: Date.now() });
     await this._saveState();
 
     // Kontext über andere Agenten (was sie tun, ohne Details)
@@ -897,7 +899,8 @@ Regeln:
 
     for (let round = 0; round < CONFIG.maxRounds; round++) {
       this._checkAborted();
-      this._patchAgent(idx, { rounds: round + 1 });
+      const roundProgress = Math.min(90, Math.round(((round + 1) / CONFIG.maxRounds) * 80 + 10));
+      this._patchAgent(idx, { rounds: round + 1, progress: roundProgress });
 
       const trimmedHistory = trimHistory(historyText);
       const fullPrompt = trimmedHistory
@@ -942,9 +945,10 @@ Regeln:
 
         if (isDone || round >= CONFIG.maxRounds - 1) {
           logger.info('Agent fertig', { agent: idx + 1, rounds: this.agents[idx].rounds });
+          if (isDone) this._patchAgent(idx, { progress: 95 });
           const agentEndTime = Date.now();
           const agentDuration = Math.round((agentEndTime - (this.agents[idx].startTime || agentEndTime)) / 1000);
-          this._patchAgent(idx, { status: 'done', endTime: agentEndTime, duration: agentDuration });
+          this._patchAgent(idx, { status: 'done', progress: 100, endTime: agentEndTime, duration: agentDuration });
           // Transcript speichern
           try {
             await fsp.writeFile(path.join(agentDir, 'transcript.md'),
@@ -963,7 +967,7 @@ Regeln:
     }
     const agentEndTime2 = Date.now();
     const agentDuration2 = Math.round((agentEndTime2 - (this.agents[idx].startTime || agentEndTime2)) / 1000);
-    this._patchAgent(idx, { status: 'done', endTime: agentEndTime2, duration: agentDuration2 });
+    this._patchAgent(idx, { status: 'done', progress: 100, endTime: agentEndTime2, duration: agentDuration2 });
     await this._writeSharedContext(idx);
     await this._saveState();
   }
@@ -1140,6 +1144,7 @@ Antworte in 3-6 Sätzen, klar und konkret.`;
     this.agents[idx].conversation = [];
     this.agents[idx].rounds = 0;
     this.agents[idx].questions = 0;
+    this.agents[idx].progress = 0;
     this.agents[idx].startTime = null;
     this.agents[idx].endTime = null;
     this.agents[idx].duration = null;
