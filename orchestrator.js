@@ -562,6 +562,9 @@ class Orchestrator extends EventEmitter {
 
     if (this._abortController.signal.aborted) return;
 
+    // Koordinator-Zusammenfassung erstellen
+    await this._coordinatorSummary();
+
     this.phase = 'complete';
     this.completedAt = Date.now();
     this.totalDuration = Math.round((this.completedAt - (this.startedAt || this.completedAt)) / 1000);
@@ -791,6 +794,46 @@ Antworte direkt und konkret.`;
     this.emit('coordinator', this._coordState());
     await this._saveState();
     return answer;
+  }
+
+  // ── Koordinator: Abschluss-Zusammenfassung ──────────────────
+  async _coordinatorSummary() {
+    try {
+      this.coordStatus = 'summarizing';
+      this.emit('coordinator', this._coordState());
+
+      const agentResults = this.agents.map((a, i) => {
+        const task = this.tasks[i];
+        return `- Agent ${i + 1} "${a.title}": Status=${a.status}, Lieferergebnis: ${task ? task.deliverable : 'n/a'}`;
+      }).join('\n');
+
+      const prompt =
+`Du bist Projekt-Koordinator. Alle Agenten sind fertig. Erstelle eine kurze, prägnante Zusammenfassung auf Deutsch.
+
+Projektbeschreibung: ${this.projectDesc}
+
+Ergebnisse der Agenten:
+${agentResults}
+
+Fasse zusammen:
+1. Was wurde insgesamt erreicht?
+2. Welche Agenten waren erfolgreich, welche nicht?
+3. Gibt es offene Punkte oder Empfehlungen?
+
+Antworte in 3-6 Sätzen, klar und konkret.`;
+
+      const summary = await runClaude(prompt, this.projectDir, this, this._activeProcesses, this._abortController.signal);
+      this.projectSummary = summary;
+      this.coordStatus = 'done';
+      this.emit('coordinator', this._coordState());
+      this.emit('project_meta', { title: this.projectTitle, summary: this.projectSummary, dir: this.projectDir });
+      await this._saveState();
+    } catch (e) {
+      // Nicht-kritisch: bei Fehler alte Zusammenfassung behalten
+      logger.warn('Koordinator-Zusammenfassung fehlgeschlagen', { error: e.message });
+      this.coordStatus = 'done';
+      this.emit('coordinator', this._coordState());
+    }
   }
 
   // ── Einzelnen Agenten neu starten ───────────────────────────

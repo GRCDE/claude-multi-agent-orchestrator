@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "jest --verbose",
+    "test": "jest --verbose --runInBand --forceExit",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
