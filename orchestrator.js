@@ -314,6 +314,9 @@ class Orchestrator extends EventEmitter {
     this.coordStatus = 'idle';
     this.coordActiveQ = null;
     this.phase = 'idle';
+    this.startedAt = null;
+    this.completedAt = null;
+    this.totalDuration = null;
   }
 
   emit(event, data) {
@@ -333,7 +336,10 @@ class Orchestrator extends EventEmitter {
         activeQuestion: this.coordActiveQ,
         log: this.coordLog
       },
-      agents: this.agents
+      agents: this.agents,
+      startedAt: this.startedAt,
+      completedAt: this.completedAt,
+      totalDuration: this.totalDuration
     };
   }
 
@@ -402,12 +408,16 @@ class Orchestrator extends EventEmitter {
 
     this.phase = 'running';
     this.coordStatus = 'planning';
+    this.startedAt = Date.now();
+    this.completedAt = null;
+    this.totalDuration = null;
     this.agents = Array.from({ length: clampedCount }, (_, i) => ({
-      id: i, title: 'Wird geplant…', task: '', deliverable: '',
+      id: i, title: 'Wird geplant…', task: '', deliverable: '', role: '',
       status: 'waiting', conversation: [], rounds: 0, questions: 0,
+      startTime: null, endTime: null, duration: null,
       workDir: path.join(this.projectDir, `agent-${i + 1}`)
     }));
-    this.emit('phase', { phase: 'running' });
+    this.emit('phase', { phase: 'running', startedAt: this.startedAt });
     this.emit('coordinator', this._coordState());
     await this._saveState();
 
@@ -449,8 +459,10 @@ class Orchestrator extends EventEmitter {
     if (this._abortController.signal.aborted) return;
 
     this.phase = 'complete';
-    logger.info('Projekt abgeschlossen', { projectId: this.projectId, agents: this.tasks.length });
-    this.emit('phase', { phase: 'complete' });
+    this.completedAt = Date.now();
+    this.totalDuration = Math.round((this.completedAt - (this.startedAt || this.completedAt)) / 1000);
+    logger.info('Projekt abgeschlossen', { projectId: this.projectId, agents: this.tasks.length, totalDuration: this.totalDuration });
+    this.emit('phase', { phase: 'complete', totalDuration: this.totalDuration });
     await this._saveState();
   }
 
@@ -466,7 +478,7 @@ Constraints:
 - Jede Aufgabe soll verschiedene Fähigkeiten/Bereiche abdecken
 
 Antworte NUR mit validem JSON (kein Markdown, kein Text davor/danach):
-{"project_title":"string","summary":"1-2 Sätze auf Deutsch","quality_notes":"Kurze Begründung warum die Aufgaben unabhängig sind","tasks":[{"title":"Kurztitel","task":"Detaillierte Aufgabe","deliverable":"Was der Agent liefern soll"}]}
+{"project_title":"string","summary":"1-2 Sätze auf Deutsch","quality_notes":"Kurze Begründung warum die Aufgaben unabhängig sind","tasks":[{"title":"Kurztitel","task":"Detaillierte Aufgabe","deliverable":"Was der Agent liefern soll","role":"Passende Rolle, z.B. Backend-Entwickler, Frontend-Entwickler, DevOps-Ingenieur, etc."}]}
 
 Projekt: ${this.projectDesc}`;
 
@@ -502,7 +514,7 @@ Projekt: ${this.projectDesc}`;
         if (e.code === 'ENOSPC') throw new Error('Kein Speicherplatz mehr verfügbar');
         throw e;
       }
-      this._patchAgent(i, { title: task.title, task: task.task, deliverable: task.deliverable, workDir: agentDir });
+      this._patchAgent(i, { title: task.title, task: task.task, deliverable: task.deliverable, role: task.role || '', workDir: agentDir });
     }
 
     // Projekt-Übersicht speichern
@@ -524,7 +536,7 @@ Projekt: ${this.projectDesc}`;
 
     validateWorkDir(agentDir);
     logger.info('Agent gestartet', { agent: agentNum, task: task.title });
-    this._patchAgent(idx, { status: 'working' });
+    this._patchAgent(idx, { status: 'working', startTime: Date.now() });
     await this._saveState();
 
     // Kontext über andere Agenten (was sie tun, ohne Details)
@@ -533,14 +545,20 @@ Projekt: ${this.projectDesc}`;
       .filter(Boolean)
       .join('\n');
 
+    // Shared Context von bereits fertigen Agenten lesen
+    const sharedCtx = await this._readSharedContext();
+
     // Lokaler Fragen-Zähler
     let questionsUsed = 0;
 
     // Verlauf für Multi-Turn (wird in den Prompt injiziert)
     let historyText = '';
 
+    // Rollen-Prefix falls vorhanden
+    const rolePrefix = task.role ? `Du bist ein erfahrener ${task.role}.\n` : '';
+
     const agentSystemPrompt =
-`Du bist Agent ${agentNum} im Projekt "${this.projectTitle}".
+`${rolePrefix}Du bist Agent ${agentNum} im Projekt "${this.projectTitle}".
 Du arbeitest in deinem Verzeichnis: ${agentDir}
 
 Deine Aufgabe: ${task.task}
@@ -548,7 +566,7 @@ Dein Lieferergebnis: ${task.deliverable}
 
 Andere Agenten im Projekt (arbeiten parallel – NICHT von ihnen abhängig machen):
 ${otherAgentsCtx || 'Keine'}
-
+${sharedCtx ? `\nBisheriger Kontext anderer Agenten:\n${sharedCtx}\n` : ''}
 Regeln:
 1. Arbeite konkret und erstelle echte Dateien in deinem Verzeichnis
 2. Wenn du eine Klärung vom Koordinator brauchst: schreibe EXAKT "FRAGE: [deine genaue Frage]" und STOPPE SOFORT danach – schreibe NICHTS mehr nach der Frage
@@ -603,7 +621,9 @@ Regeln:
 
         if (isDone || round >= CONFIG.maxRounds - 1) {
           logger.info('Agent fertig', { agent: idx + 1, rounds: this.agents[idx].rounds });
-          this._patchAgent(idx, { status: 'done' });
+          const agentEndTime = Date.now();
+          const agentDuration = Math.round((agentEndTime - (this.agents[idx].startTime || agentEndTime)) / 1000);
+          this._patchAgent(idx, { status: 'done', endTime: agentEndTime, duration: agentDuration });
           // Transcript speichern
           try {
             await fsp.writeFile(path.join(agentDir, 'transcript.md'),
@@ -613,12 +633,17 @@ Regeln:
               this._addAgentMsg(idx, { from: 'agent', text: 'Warnung: Kein Speicherplatz für Transcript', type: 'work' });
             }
           }
+          // Shared Context aktualisieren für nachfolgende Agenten
+          await this._writeSharedContext(idx);
           await this._saveState();
           return;
         }
       }
     }
-    this._patchAgent(idx, { status: 'done' });
+    const agentEndTime2 = Date.now();
+    const agentDuration2 = Math.round((agentEndTime2 - (this.agents[idx].startTime || agentEndTime2)) / 1000);
+    this._patchAgent(idx, { status: 'done', endTime: agentEndTime2, duration: agentDuration2 });
+    await this._writeSharedContext(idx);
     await this._saveState();
   }
 
@@ -669,7 +694,48 @@ Antworte direkt und konkret.`;
     this.agents[idx].conversation = [];
     this.agents[idx].rounds = 0;
     this.agents[idx].questions = 0;
+    this.agents[idx].startTime = null;
+    this.agents[idx].endTime = null;
+    this.agents[idx].duration = null;
     await this._runAgent(idx);
+  }
+
+  // ── Shared Context: lesen und schreiben ─────────────────────
+  async _readSharedContext() {
+    if (!this.projectDir) return '';
+    const ctxFile = path.join(this.projectDir, 'shared-context.md');
+    try {
+      const content = await fsp.readFile(ctxFile, 'utf-8');
+      return content.trim();
+    } catch {
+      return '';
+    }
+  }
+
+  async _writeSharedContext(agentIdx) {
+    if (!this.projectDir) return;
+    const agent = this.agents[agentIdx];
+    const task = this.tasks[agentIdx];
+    const agentNum = agentIdx + 1;
+
+    // Dateien im Agent-Verzeichnis auflesen
+    let files = [];
+    try {
+      files = fs.readdirSync(agent.workDir).filter(f => f !== 'conversation.jsonl');
+    } catch {}
+
+    const entry = `## Agent ${agentNum}: ${task.title}\n` +
+      `${task.deliverable}\n` +
+      `Dateien: ${files.length > 0 ? files.join(', ') : 'keine'}\n\n`;
+
+    const ctxFile = path.join(this.projectDir, 'shared-context.md');
+    try {
+      await fsp.appendFile(ctxFile, entry);
+    } catch (e) {
+      if (e.code === 'ENOSPC') {
+        logger.warn('Kein Speicherplatz für shared-context.md');
+      }
+    }
   }
 
   // ── Hilfsfunktionen ─────────────────────────────────────────

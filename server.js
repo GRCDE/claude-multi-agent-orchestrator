@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const archiver = require('archiver');
 const logger = require('./src/logger');
 const Orchestrator = require('./orchestrator');
 
@@ -208,7 +209,10 @@ app.get('/api/projects', (req, res) => {
         title: state?.projectTitle || d,
         phase: state?.phase || 'unknown',
         agentCount: state?.agents?.length || 0,
-        createdAt: parseInt(d.replace('proj_', '')) || 0
+        createdAt: parseInt(d.replace('proj_', '')) || 0,
+        totalDuration: state?.totalDuration || null,
+        startedAt: state?.startedAt || null,
+        completedAt: state?.completedAt || null
       };
     })
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -249,6 +253,34 @@ app.get('/api/files/:id', (req, res) => {
   }
 
   res.json(list(dir));
+});
+
+// ── ZIP Export ───────────────────────────────────────────
+app.get('/api/export/:id', (req, res) => {
+  const dir = path.join(__dirname, 'projects', req.params.id);
+  // Pfad-Traversal verhindern
+  if (!dir.startsWith(path.join(__dirname, 'projects'))) {
+    return res.status(400).json({ error: 'Ungültiger Pfad' });
+  }
+  if (!fs.existsSync(dir)) {
+    return res.status(404).json({ error: 'Projekt nicht gefunden' });
+  }
+
+  const zipName = req.params.id + '.zip';
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', 'attachment; filename="' + zipName + '"');
+
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.on('error', (err) => {
+    logger.error('ZIP-Export Fehler', { error: err.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'ZIP-Erstellung fehlgeschlagen' });
+    }
+  });
+
+  archive.pipe(res);
+  archive.directory(dir, req.params.id);
+  archive.finalize();
 });
 
 // ── Agent Retry ──────────────────────────────────────────────

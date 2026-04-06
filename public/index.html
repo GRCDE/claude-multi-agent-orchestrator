@@ -203,6 +203,41 @@
   .history-title { color: var(--txt); font-weight: 500; }
   .history-empty { color: var(--txt3); font-size: 12px; font-style: italic; }
 
+  /* ── Modal overlay ────────────────────────────────────── */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    animation: modal-fadein 0.2s ease;
+  }
+  @keyframes modal-fadein { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--bg); border: 0.5px solid var(--border);
+    border-radius: var(--radius); max-width: 720px; width: 95%;
+    max-height: 80vh; overflow-y: auto; padding: 1.5rem;
+    box-shadow: var(--shadow-md); position: relative;
+    animation: fadein 0.2s ease;
+  }
+  .modal-close {
+    position: absolute; top: 12px; right: 14px;
+    background: none; border: none; cursor: pointer;
+    font-size: 22px; color: var(--txt3); line-height: 1;
+    padding: 4px 8px; border-radius: 4px;
+    transition: background var(--transition), color var(--transition);
+  }
+  .modal-close:hover { background: var(--bg3); color: var(--txt); }
+  .modal-header { margin-bottom: 1rem; padding-right: 2rem; }
+  .modal-agent-num { font-size: 11px; color: var(--txt2); font-weight: 500; }
+  .modal-agent-title { font-size: 16px; font-weight: 600; margin: 2px 0 6px; }
+  .modal-agent-task { font-size: 13px; color: var(--txt2); line-height: 1.6;
+    border-left: 2px solid var(--border); padding-left: 10px; margin-bottom: 1rem; }
+  .modal-conv { display: flex; flex-direction: column; gap: 8px; }
+  .modal-conv .bubble { max-width: 95%; }
+  .agent-title-link { cursor: pointer; color: inherit; text-decoration: none; }
+  .agent-title-link:hover { text-decoration: underline; }
+  .details-link { font-size: 11px; color: var(--txt3); cursor: pointer; text-decoration: none; }
+  .details-link:hover { color: var(--txt2); text-decoration: underline; }
+
   /* ── Mobile responsive ─────────────────────────────────── */
   @media (max-width: 768px) {
     #app { padding: 1rem; }
@@ -234,7 +269,8 @@ let state = {
   phase: 'setup',
   projectTitle: '', projectSummary: '', projectDir: '',
   coordinator: { status: 'idle', summary: '', activeQuestion: null, log: [] },
-  agents: []
+  agents: [],
+  startedAt: null, completedAt: null, totalDuration: null
 };
 let busy = false;
 let lastPhase = 'setup';
@@ -304,8 +340,12 @@ function connect() {
   });
 
   es.addEventListener('phase', function(e) {
-    var newPhase = JSON.parse(e.data).phase;
-    state.phase = newPhase;
+    var d = JSON.parse(e.data);
+    state.phase = d.phase;
+    if (d.startedAt) state.startedAt = d.startedAt;
+    if (d.totalDuration != null) { state.totalDuration = d.totalDuration; state.completedAt = Date.now(); }
+    if (d.phase === 'running') startElapsedTimer();
+    if (d.phase === 'complete' || d.phase === 'error') stopElapsedTimer();
     render();
   });
 
@@ -398,6 +438,9 @@ function applyState(s) {
   state.projectTitle = s.projectTitle || '';
   state.projectSummary = s.projectSummary || '';
   state.projectDir = s.projectDir || '';
+  state.startedAt = s.startedAt || null;
+  state.completedAt = s.completedAt || null;
+  state.totalDuration = s.totalDuration || null;
 }
 
 // ── Banner Management ────────────────────────────────────────
@@ -453,6 +496,37 @@ function badge(s) {
 
 function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '\u2026' : (s || ''); }
 
+// -- Zeitformatierung --
+function formatDuration(seconds) {
+  if (seconds == null) return '';
+  seconds = Math.round(seconds);
+  if (seconds < 60) return seconds + 's';
+  if (seconds < 3600) return Math.floor(seconds / 60) + 'm ' + (seconds % 60) + 's';
+  var h = Math.floor(seconds / 3600);
+  var m = Math.floor((seconds % 3600) / 60);
+  return h + 'h ' + m + 'm';
+}
+
+function getElapsedSeconds() {
+  if (!state.startedAt) return null;
+  if (state.completedAt) return Math.round((state.completedAt - state.startedAt) / 1000);
+  return Math.round((Date.now() - state.startedAt) / 1000);
+}
+
+var elapsedTimer = null;
+function startElapsedTimer() {
+  if (elapsedTimer) return;
+  elapsedTimer = setInterval(function() {
+    var el = document.getElementById('elapsedTime');
+    if (el && state.startedAt && !state.completedAt) {
+      el.textContent = formatDuration(getElapsedSeconds());
+    }
+  }, 1000);
+}
+function stopElapsedTimer() {
+  if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+}
+
 // ── Copy Button ──────────────────────────────────────────────
 function copyText(btn) {
   var bubble = btn.closest('.bubble');
@@ -474,6 +548,8 @@ function render() {
     app.innerHTML = renderDashboard();
     renderBanners();
     scrollConvos();
+    if (state.phase === 'running') startElapsedTimer();
+    else stopElapsedTimer();
   }
   lastPhase = state.phase;
 }
@@ -495,7 +571,7 @@ function updateAgent(index) {
   var foot = card.querySelector('.agent-foot');
   if (foot) {
     var retryHtml = agent.status === 'error' ? ' <button class="btn-retry" onclick="retryAgent(' + index + ')">Neu starten</button>' : '';
-    foot.innerHTML = esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen') + retryHtml;
+    foot.innerHTML = '<span>' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (agent.duration != null ? ' \u00B7 ' + formatDuration(agent.duration) : '')) + '</span><span>' + retryHtml + '</span>';
   }
   // update card class for border color
   card.className = 'agent-card ' + (agent.status || 'waiting');
@@ -587,9 +663,10 @@ function renderDashboard() {
     html += '<div class="complete-banner fadein">' +
       '<div style="flex:1">' +
         '<div class="complete-title">\u2713 Alle ' + esc(String(total)) + ' Agenten abgeschlossen</div>' +
-        '<div class="complete-sub">' + (totalQ > 0 ? esc(totalQ + ' R\u00FCckfrage' + (totalQ !== 1 ? 'n' : '') + ' beantwortet') : 'Keine R\u00FCckfragen n\u00F6tig') + '</div>' +
+        '<div class="complete-sub">' + (totalQ > 0 ? esc(totalQ + ' R\u00FCckfrage' + (totalQ !== 1 ? 'n' : '') + ' beantwortet') : 'Keine R\u00FCckfragen n\u00F6tig') + (state.totalDuration ? ' \u00B7 Gesamtdauer: ' + esc(formatDuration(state.totalDuration)) : '') + '</div>' +
         (state.projectDir ? '<div class="complete-path">' + esc(state.projectDir) + '</div>' : '') +
       '</div>' +
+      '<button class="btn-outline" onclick="exportProject()">ZIP Export</button> ' +
       '<button class="btn-outline" onclick="resetProject()">Neues Projekt</button>' +
     '</div>';
   }
@@ -604,9 +681,10 @@ function renderDashboard() {
       '</div>' +
       '<div class="stats-row">' +
         (isComplete
-          ? '<button class="btn-outline" onclick="resetProject()">Neues Projekt</button>'
+          ? '<button class="btn-outline" onclick="exportProject()">ZIP Export</button> <button class="btn-outline" onclick="resetProject()">Neues Projekt</button>'
           : '<div>' +
               '<div class="stat-label" id="statLabel">' + esc(done + ' / ' + total + ' fertig') + (working > 0 ? ' \u00B7 ' + esc(String(working)) + ' aktiv' : '') + ' \u00B7 ' + esc(String(totalQ)) + ' Dialoge</div>' +
+              '<div style="font-size:11px;color:var(--txt3);margin-bottom:3px" id="elapsedTime">' + (state.startedAt ? esc(formatDuration(getElapsedSeconds())) : '') + '</div>' +
               '<div class="pbar-wrap" style="width:150px"><div class="pbar-fill" id="pbarFill" style="width:' + pct + '%"></div></div>' +
             '</div>') +
       '</div>' +
@@ -674,6 +752,67 @@ function renderBubble(m) {
   }
 }
 
+function renderBubbleFull(m) {
+  var copyBtn = '<button class="copy-btn" onclick="copyText(this)" title="Kopieren">\u2398</button>';
+  if (m.from === 'coordinator') {
+    return '<div class="bubble-wrap right"><div class="bubble bubble-coordinator">' + copyBtn +
+      '<div class="bubble-label">Koordinator \u2192</div><div class="bubble-text">' + esc(m.text || '') + '</div></div></div>';
+  } else if (m.type === 'question') {
+    return '<div class="bubble-wrap"><div class="bubble bubble-question">' + copyBtn +
+      '<div class="bubble-label">Frage \u2192</div><div class="bubble-text">' + esc(m.text || '') + '</div></div></div>';
+  } else {
+    return '<div class="bubble-wrap"><div class="bubble bubble-agent">' + copyBtn +
+      '<div class="bubble-text">' + esc(m.text || '') + '</div></div></div>';
+  }
+}
+
+function openAgentModal(idx) {
+  var agent = state.agents[idx];
+  if (!agent) return;
+  // Remove existing modal if any
+  closeModal();
+  var conv = agent.conversation || [];
+  var bubblesHtml = '';
+  if (conv.length === 0) {
+    bubblesHtml = '<div class="bubble-empty">' + (agent.status === 'waiting' ? 'Wartet auf Zuweisung\u2026' : 'Noch keine Nachrichten.') + '</div>';
+  } else {
+    bubblesHtml = conv.map(function(m) { return renderBubbleFull(m); }).join('');
+  }
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'agentModal';
+  overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+
+  overlay.innerHTML = '<div class="modal">' +
+    '<button class="modal-close" onclick="closeModal()" title="Schlie\u00DFen">\u00D7</button>' +
+    '<div class="modal-header">' +
+      '<div class="modal-agent-num">Agent ' + esc(String(idx + 1)) + '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div class="modal-agent-title">' + esc(agent.title || '\u2014') + '</div>' +
+        badge(agent.status || 'waiting') +
+      '</div>' +
+      (agent.task ? '<div class="modal-agent-task">' + esc(agent.task) + '</div>' : '') +
+    '</div>' +
+    '<div class="section-label">Vollst\u00E4ndiger Verlauf (' + esc(String(conv.length)) + ' Nachrichten)</div>' +
+    '<div class="modal-conv">' + bubblesHtml + '</div>' +
+  '</div>';
+
+  document.body.appendChild(overlay);
+  // Close on Escape key
+  document.addEventListener('keydown', modalKeyHandler);
+}
+
+function closeModal() {
+  var modal = document.getElementById('agentModal');
+  if (modal) modal.remove();
+  document.removeEventListener('keydown', modalKeyHandler);
+}
+
+function modalKeyHandler(e) {
+  if (e.key === 'Escape') closeModal();
+}
+
 function renderAgent(agent, idx) {
   var conv = agent.conversation || [];
   var bubbles = '';
@@ -689,13 +828,13 @@ function renderAgent(agent, idx) {
     '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
       '<div>' +
         '<div class="agent-num">Agent ' + esc(String(idx + 1)) + '</div>' +
-        '<div class="agent-title">' + esc(agent.title || '\u2014') + '</div>' +
+        '<div class="agent-title"><a class="agent-title-link" onclick="openAgentModal(' + idx + ')">' + esc(agent.title || '\u2014') + '</a></div>' +
       '</div>' +
       '<span class="agent-badge">' + badge(agent.status || 'waiting') + '</span>' +
     '</div>' +
     (agent.task ? '<div class="agent-task">' + esc(truncate(agent.task, 90)) + '</div>' : '') +
     '<div class="agent-conv">' + bubbles + '</div>' +
-    '<div class="agent-foot">' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen') + retryBtn + '</div>' +
+    '<div class="agent-foot"><span>' + esc((agent.rounds || 0) + ' Runden \u00B7 ' + (agent.questions || 0) + ' Fragen' + (agent.duration != null ? ' \u00B7 ' + formatDuration(agent.duration) : '')) + '</span><span>' + retryBtn + ' <a class="details-link" onclick="openAgentModal(' + idx + ')">Details</a></span></div>' +
   '</div>';
 }
 
@@ -724,7 +863,7 @@ function renderHistory() {
   var html = '<div class="section-label">Bisherige Projekte</div>';
   projectHistory.forEach(function(p) {
     html += '<div class="history-item" onclick="loadProject(\'' + esc(p.id || p) + '\')">' +
-      '<span class="history-title">' + esc(p.title || p.id || p) + '</span>' +
+      '<span class="history-title">' + esc(p.title || p.id || p) + (p.totalDuration ? ' (' + formatDuration(p.totalDuration) + ')' : '') + '</span>' +
       '<span class="history-id">' + esc(p.id || p) + '</span>' +
     '</div>';
   });
@@ -788,10 +927,20 @@ async function resetProject() {
   state = {
     phase: 'setup', projectTitle: '', projectSummary: '', projectDir: '',
     coordinator: { status: 'idle', summary: '', activeQuestion: null, log: [] },
-    agents: []
+    agents: [], startedAt: null, completedAt: null, totalDuration: null
   };
   banners = [];
   render();
+}
+
+function exportProject() {
+  var dir = state.projectDir || '';
+  var id = dir.split('/').pop() || dir.split('\\').pop() || '';
+  if (!id) {
+    addBanner('error', 'Keine Projekt-ID gefunden.');
+    return;
+  }
+  window.location = '/api/export/' + encodeURIComponent(id);
 }
 
 async function retryAgent(index) {
