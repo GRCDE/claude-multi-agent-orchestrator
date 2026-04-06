@@ -3597,6 +3597,48 @@ function copyText(btn) {
   });
 }
 
+// ── Rollen-System ─────────────────────────────────────────────
+var cachedRoles = [];
+var rolesLoaded = false;
+
+function loadRolesCache() {
+  return fetch("/api/roles").then(function(r) { return r.json(); }).then(function(data) {
+    cachedRoles = data.roles || [];
+    rolesLoaded = true;
+    return cachedRoles;
+  }).catch(function(e) { console.warn("Rollen laden fehlgeschlagen", e); cachedRoles = []; rolesLoaded = true; });
+}
+
+function getRoleMeta(roleId) {
+  if (!roleId || !cachedRoles.length) return null;
+  return cachedRoles.find(function(r) { return r.id === roleId; }) || null;
+}
+
+function roleColorStyle(roleId) {
+  var role = getRoleMeta(roleId);
+  if (!role || !role.color) return "background:var(--bg2);color:var(--txt3)";
+  return "background:" + esc(role.color) + ";color:#fff";
+}
+
+function renderRoleDropdown(index, currentRoleId) {
+  var html = '<select class="role-select" id="approvalRole' + index + '" onchange="updateApprovalRole(' + index + ')">' +
+    '<option value="">-- Keine Rolle --</option>';
+  for (var r = 0; r < cachedRoles.length; r++) {
+    var role = cachedRoles[r];
+    var sel = role.id === currentRoleId ? " selected" : "";
+    html += '<option value="' + esc(role.id) + '"' + sel + '>' + esc(role.name) + '</option>';
+  }
+  html += '</select>';
+  return html;
+}
+
+function updateApprovalRole(index) {
+  var sel = document.getElementById("approvalRole" + index);
+  if (!sel) return;
+  var agents = state.agents || [];
+  if (agents[index]) agents[index].role = sel.value;
+}
+
 // ── Render (Full) ────────────────────────────────────────────
 function render() {
   var app = document.getElementById('app');
@@ -3901,45 +3943,6 @@ function renderSetup() {
     '</div>' +
     '<div class="field" style="margin-top:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">' +
       '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">' +
-// ── Rollen-System ─────────────────────────────────────────────
-function loadRolesCache() {
-  return fetch("/api/roles").then(function(r) { return r.json(); }).then(function(data) {
-    cachedRoles = data.roles || [];
-    rolesLoaded = true;
-    return cachedRoles;
-  }).catch(function(e) { console.warn("Rollen laden fehlgeschlagen", e); cachedRoles = []; rolesLoaded = true; });
-}
-
-function getRoleMeta(roleId) {
-  if (!roleId || !cachedRoles.length) return null;
-  return cachedRoles.find(function(r) { return r.id === roleId; }) || null;
-}
-
-function roleColorStyle(roleId) {
-  var role = getRoleMeta(roleId);
-  if (!role || !role.color) return "background:var(--bg2);color:var(--txt3)";
-  return "background:" + esc(role.color) + ";color:#fff";
-}
-
-function renderRoleDropdown(index, currentRoleId) {
-  var html = '<select class="role-select" id="approvalRole' + index + '" onchange="updateApprovalRole(' + index + ')">' +
-    '<option value="">-- Keine Rolle --</option>';
-  for (var r = 0; r < cachedRoles.length; r++) {
-    var role = cachedRoles[r];
-    var sel = role.id === currentRoleId ? " selected" : "";
-    html += '<option value="' + esc(role.id) + '"' + sel + '>' + esc(role.name) + '</option>';
-  }
-  html += '</select>';
-  return html;
-}
-
-function updateApprovalRole(index) {
-  var sel = document.getElementById("approvalRole" + index);
-  if (!sel) return;
-  var agents = state.agents || [];
-  if (agents[index]) agents[index].role = sel.value;
-}
-
         '<input type="checkbox" id="approvalCheck" aria-label="Plan vor Start pr\u00FCfen"> Plan vor Start pr\u00FCfen' + ctxHelp('Wenn aktiviert, siehst du den Plan des Koordinators bevor die Agenten loslegen. Du kannst Aufgaben \u00E4ndern, entfernen oder umordnen.') +
       '</label>' +
       '<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px">' +
