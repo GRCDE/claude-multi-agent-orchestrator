@@ -284,13 +284,42 @@ function validatePlan(parsed) {
   return parsed;
 }
 
+// ── Hook-System: Lade optionale hooks.js aus Projekt-Root ────
+function loadHooks() {
+  try {
+    const hooks = require('./hooks');
+    if (hooks && typeof hooks === 'object') {
+      logger.info('Hooks geladen', { hooks: Object.keys(hooks).filter(k => typeof hooks[k] === 'function') });
+      return hooks;
+    }
+    return {};
+  } catch (e) {
+    // hooks.js existiert nicht oder hat Syntaxfehler
+    if (e.code !== 'MODULE_NOT_FOUND') {
+      logger.warn('Fehler beim Laden von hooks.js', { error: e.message });
+    }
+    return {};
+  }
+}
+
 // ── Orchestrator ─────────────────────────────────────────────
 class Orchestrator extends EventEmitter {
   constructor() {
     super();
     this._abortController = new AbortController();
     this._activeProcesses = new Set();
+    this.hooks = loadHooks();
     this.reset();
+  }
+
+  // ── Hook ausführen (Fehler dürfen NIEMALS den Hauptprozess crashen) ──
+  async _runHook(name, data) {
+    if (!this.hooks[name] || typeof this.hooks[name] !== 'function') return;
+    try {
+      await this.hooks[name](data);
+    } catch (e) {
+      logger.warn('Hook-Fehler', { hook: name, error: e.message });
+    }
   }
 
   reset() {
@@ -424,13 +453,16 @@ class Orchestrator extends EventEmitter {
     // Schritt 1: Koordinator plant
     try {
       this._checkAborted();
+      await this._runHook('beforePlan', { description: this.projectDesc, agentCount: clampedCount });
       await this._coordinatorPlan(clampedCount);
+      await this._runHook('afterPlan', { tasks: this.tasks, projectTitle: this.projectTitle });
     } catch (e) {
       if (this._abortController.signal.aborted) return;
       this.coordStatus = 'error';
       this.emit('coordinator', { ...this._coordState(), error: sanitizeError(e.message) });
       this.phase = 'error';
       this.emit('phase', { phase: 'error' });
+      await this._runHook('onError', { phase: 'planning', error: e });
       await this._saveState();
       return;
     }
@@ -442,12 +474,18 @@ class Orchestrator extends EventEmitter {
       await semaphore.acquire();
       try {
         this._checkAborted();
+        await this._runHook('beforeAgent', { index: i, task: this.tasks[i], role: this.tasks[i].role || '' });
         await this._runAgent(i);
+        // afterAgent: Dateien im Agent-Verzeichnis auflesen
+        let agentFiles = [];
+        try { agentFiles = fs.readdirSync(this.agents[i].workDir).filter(f => f !== 'conversation.jsonl'); } catch {}
+        await this._runHook('afterAgent', { index: i, status: this.agents[i].status, duration: this.agents[i].duration, files: agentFiles });
       } catch (e) {
         if (!this._abortController.signal.aborted) {
           logger.error('Agent-Fehler', { agent: i + 1, error: e.message });
           this._patchAgent(i, { status: 'error' });
           this._addAgentMsg(i, { from: 'agent', text: `Fehler: ${sanitizeError(e.message)}`, type: 'work' });
+          await this._runHook('onError', { phase: `agent-${i + 1}`, error: e });
         }
       } finally {
         semaphore.release();
@@ -463,6 +501,7 @@ class Orchestrator extends EventEmitter {
     this.totalDuration = Math.round((this.completedAt - (this.startedAt || this.completedAt)) / 1000);
     logger.info('Projekt abgeschlossen', { projectId: this.projectId, agents: this.tasks.length, totalDuration: this.totalDuration });
     this.emit('phase', { phase: 'complete', totalDuration: this.totalDuration });
+    await this._runHook('onComplete', { projectId: this.projectId, totalDuration: this.totalDuration, agents: this.agents });
     await this._saveState();
   }
 

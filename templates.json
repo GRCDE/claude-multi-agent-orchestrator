@@ -1,0 +1,37 @@
+[
+  {
+    "id": "rest-api",
+    "name": "REST API",
+    "description": "Erstelle eine vollständige REST API mit Express.js, inklusive CRUD-Operationen, Authentifizierung, Validierung und Tests.",
+    "suggestedAgents": 4,
+    "icon": "\ud83d\udd0c"
+  },
+  {
+    "id": "cli-tool",
+    "name": "CLI Tool",
+    "description": "Erstelle ein professionelles Kommandozeilen-Tool mit Node.js, inklusive Argument-Parsing, Help-Output, Farben und Tests.",
+    "suggestedAgents": 3,
+    "icon": "\u2328\ufe0f"
+  },
+  {
+    "id": "react-app",
+    "name": "React App",
+    "description": "Erstelle eine moderne React-Anwendung mit TypeScript, Routing, State Management, API-Anbindung und responsivem Design.",
+    "suggestedAgents": 5,
+    "icon": "\u269b\ufe0f"
+  },
+  {
+    "id": "python-ml",
+    "name": "Python ML Pipeline",
+    "description": "Erstelle eine Machine-Learning-Pipeline mit Python: Datenvorverarbeitung, Feature Engineering, Modelltraining, Evaluation und Deployment-Script.",
+    "suggestedAgents": 4,
+    "icon": "\ud83e\udde0"
+  },
+  {
+    "id": "fullstack",
+    "name": "Fullstack Web App",
+    "description": "Erstelle eine Fullstack-Webanwendung mit Frontend (HTML/CSS/JS), Backend (Node.js/Express), Datenbank-Schema und Docker-Konfiguration.",
+    "suggestedAgents": 5,
+    "icon": "\ud83c\udf10"
+  }
+]

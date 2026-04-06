@@ -180,6 +180,17 @@ app.post('/api/reset', apiLimiter, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Templates API ───────────────────────────────────────────
+app.get('/api/templates', (req, res) => {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'templates.json'), 'utf8'));
+    res.json(data);
+  } catch (e) {
+    logger.error('Templates laden fehlgeschlagen', { error: e.message });
+    res.status(500).json({ error: 'Templates konnten nicht geladen werden' });
+  }
+});
+
 // ── Health-Check ─────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({
@@ -248,7 +259,9 @@ app.get('/api/files/:id', (req, res) => {
   function list(d, prefix = '') {
     return fs.readdirSync(d, { withFileTypes: true }).flatMap(e => {
       const rel = prefix ? prefix + '/' + e.name : e.name;
-      return e.isDirectory() ? list(path.join(d, e.name), rel) : [rel];
+      if (e.isDirectory()) return list(path.join(d, e.name), rel);
+      const stat = fs.statSync(path.join(d, e.name));
+      return [{ path: rel, size: stat.size }];
     });
   }
 

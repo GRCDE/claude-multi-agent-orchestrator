@@ -238,6 +238,54 @@
   .details-link { font-size: 11px; color: var(--txt3); cursor: pointer; text-decoration: none; }
   .details-link:hover { color: var(--txt2); text-decoration: underline; }
 
+  /* ── Template grid ────────────────────────────────────── */
+  .template-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 1.25rem;
+  }
+  .template-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+    cursor: pointer; transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+  }
+  .template-card:hover { background: var(--bg3); border-color: var(--border2); }
+  .template-card.selected { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(24,95,165,0.2); }
+  [data-theme="dark"] .template-card.selected { box-shadow: 0 0 0 2px rgba(133,183,235,0.25); }
+  .template-icon { font-size: 20px; margin-bottom: 4px; }
+  .template-name { font-size: 13px; font-weight: 600; }
+  .template-desc { font-size: 11px; color: var(--txt2); line-height: 1.4; margin-top: 2px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  @media (max-width: 600px) {
+    .template-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── File tree ─────────────────────────────────────────── */
+  .file-tree { margin-top: 4px; }
+  .file-tree-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer;
+    background: none; border: none; color: var(--txt2); font-size: 13px; font-weight: 500;
+    padding: 4px 0; font-family: var(--font); transition: color var(--transition); }
+  .file-tree-toggle:hover { color: var(--txt); }
+  .file-tree-toggle .arrow { display: inline-block; transition: transform 0.2s; font-size: 10px; }
+  .file-tree-toggle .arrow.open { transform: rotate(90deg); }
+  .file-tree-content { padding-top: 8px; }
+  .file-group { margin-bottom: 8px; }
+  .file-group-header { display: flex; align-items: center; gap: 6px; cursor: pointer;
+    background: none; border: none; color: var(--txt); font-size: 12px; font-weight: 600;
+    padding: 4px 6px; font-family: var(--font); border-radius: var(--radius-sm);
+    transition: background var(--transition); width: 100%; }
+  .file-group-header:hover { background: var(--bg2); }
+  .file-group-header .arrow { display: inline-block; transition: transform 0.2s; font-size: 9px; }
+  .file-group-header .arrow.open { transform: rotate(90deg); }
+  .file-group-count { font-size: 10px; color: var(--txt3); font-weight: 400; margin-left: auto; }
+  .file-group-items { padding-left: 18px; }
+  .file-item { display: flex; align-items: center; gap: 6px; padding: 2px 6px;
+    font-size: 11.5px; color: var(--txt2); border-radius: 4px; transition: background var(--transition); }
+  .file-item:hover { background: var(--bg2); }
+  .file-icon { flex-shrink: 0; font-size: 12px; width: 16px; text-align: center; }
+  .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+  .file-size { flex-shrink: 0; font-size: 10px; color: var(--txt3); font-family: var(--mono); }
+  .file-tree-empty { font-size: 11.5px; color: var(--txt3); font-style: italic; padding: 4px 0; }
+
   /* ── Mobile responsive ─────────────────────────────────── */
   @media (max-width: 768px) {
     #app { padding: 1rem; }
@@ -277,6 +325,8 @@ let lastPhase = 'setup';
 let banners = []; // { id, type: 'warn'|'error', text }
 let bannerIdCounter = 0;
 let projectHistory = [];
+let templates = [];
+let selectedTemplateId = null;
 
 // ── Dark Mode ────────────────────────────────────────────────
 let darkMode = localStorage.getItem('darkMode') !== 'false' &&
@@ -344,8 +394,8 @@ function connect() {
     state.phase = d.phase;
     if (d.startedAt) state.startedAt = d.startedAt;
     if (d.totalDuration != null) { state.totalDuration = d.totalDuration; state.completedAt = Date.now(); }
-    if (d.phase === 'running') startElapsedTimer();
-    if (d.phase === 'complete' || d.phase === 'error') stopElapsedTimer();
+    if (d.phase === 'running') { startElapsedTimer(); if (fileTreeOpen) startFileTreePolling(); }
+    if (d.phase === 'complete' || d.phase === 'error') { stopElapsedTimer(); if (fileTreeOpen) loadFileTree(); }
     render();
   });
 
@@ -622,10 +672,27 @@ function updateProgressBar() {
 
 // ── Render: Setup ────────────────────────────────────────────
 function renderSetup() {
+  var tplHtml = '';
+  if (templates.length > 0) {
+    tplHtml = '<div class="field">' +
+      '<label>Vorlage w\u00E4hlen</label>' +
+      '<div class="template-grid">' +
+      templates.map(function(t) {
+        var sel = selectedTemplateId === t.id ? ' selected' : '';
+        return '<div class="template-card' + sel + '" onclick="selectTemplate(\'' + esc(t.id) + '\')">' +
+          '<div class="template-icon">' + t.icon + '</div>' +
+          '<div class="template-name">' + esc(t.name) + '</div>' +
+          '<div class="template-desc">' + esc(t.description) + '</div>' +
+        '</div>';
+      }).join('') +
+      '</div></div>';
+  }
+
   return '<div class="card setup-box">' +
     '<div class="setup-title">Agent Orchestrator</div>' +
     '<div class="setup-sub">Der Koordinator plant das Projekt und weist Claude Code Agenten Aufgaben zu.<br>' +
     'Agenten k\u00F6nnen R\u00FCckfragen stellen \u2013 der Koordinator antwortet. Alle Outputs landen als echte Dateien auf deiner Festplatte.</div>' +
+    tplHtml +
     '<div class="field">' +
       '<label>Projektbeschreibung</label>' +
       '<textarea id="desc" placeholder="z.B. Erstelle eine vollst\u00E4ndige REST API f\u00FCr einen Online-Shop mit Produkten, Bestellungen und Nutzerverwaltung. Nutze Node.js, TypeScript und PostgreSQL."></textarea>' +
@@ -704,6 +771,17 @@ function renderDashboard() {
       '<div class="agent-grid">' + agents.map(function(a, i) { return renderAgent(a, i); }).join('') + '</div>' +
     '</div>';
   }
+
+  // File tree
+  html += '<div>' +
+    '<div class="section-label">Dateien</div>' +
+    '<div class="card card-sm">' +
+      '<button class="file-tree-toggle" onclick="toggleFileTree()">' +
+        '<span class="arrow" id="fileTreeArrow">\u25B6</span> Dateibaum anzeigen' +
+      '</button>' +
+      '<div class="file-tree" id="fileTreeContent" style="display:none"></div>' +
+    '</div>' +
+  '</div>';
 
   html += '</div>';
   return html;
@@ -838,6 +916,58 @@ function renderAgent(agent, idx) {
   '</div>';
 }
 
+// ── Templates ────────────────────────────────────────────────
+function loadTemplates() {
+  fetch('/api/templates').then(function(r) {
+    if (!r.ok) throw new Error('not found');
+    return r.json();
+  }).then(function(data) {
+    templates = data || [];
+    // Re-render setup if we're on that screen
+    if (state.phase === 'setup' || state.phase === 'idle') render();
+  }).catch(function() {
+    templates = [];
+  });
+}
+
+function selectTemplate(id) {
+  var tpl = templates.find(function(t) { return t.id === id; });
+  if (!tpl) return;
+
+  // Toggle: clicking the same template deselects it
+  if (selectedTemplateId === id) {
+    selectedTemplateId = null;
+    // Clear textarea and reset slider
+    var descEl = document.getElementById('desc');
+    if (descEl) descEl.value = '';
+    var slider = document.getElementById('countSlider');
+    var display = document.getElementById('countDisplay');
+    if (slider) { slider.value = '3'; }
+    if (display) { display.textContent = '3'; }
+    // Update card highlights
+    document.querySelectorAll('.template-card').forEach(function(c) { c.classList.remove('selected'); });
+    return;
+  }
+
+  selectedTemplateId = id;
+
+  // Fill textarea with template description
+  var descEl = document.getElementById('desc');
+  if (descEl) descEl.value = tpl.description;
+
+  // Set agent slider to suggested count (clamped to slider range 2-5)
+  var count = Math.max(2, Math.min(5, tpl.suggestedAgents || 3));
+  var slider = document.getElementById('countSlider');
+  var display = document.getElementById('countDisplay');
+  if (slider) { slider.value = String(count); }
+  if (display) { display.textContent = String(count); }
+
+  // Update card highlights
+  document.querySelectorAll('.template-card').forEach(function(c) { c.classList.remove('selected'); });
+  var clicked = document.querySelector('.template-card[onclick*="' + id + '"]');
+  if (clicked) clicked.classList.add('selected');
+}
+
 // ── History ──────────────────────────────────────────────────
 function loadHistory() {
   fetch('/api/projects').then(function(r) {
@@ -930,6 +1060,9 @@ async function resetProject() {
     agents: [], startedAt: null, completedAt: null, totalDuration: null
   };
   banners = [];
+  fileTreeOpen = false;
+  fileGroupState = {};
+  stopFileTreePolling();
   render();
 }
 
@@ -954,8 +1087,155 @@ async function retryAgent(index) {
   }
 }
 
+// ── File Tree ─────────────────────────────────────────────────
+var fileTreeOpen = false;
+var fileTreeTimer = null;
+var fileGroupState = {}; // track which groups are open
+
+function getProjectId() {
+  var dir = state.projectDir || '';
+  return dir.split('/').pop() || dir.split('\\').pop() || '';
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function fileIcon(filename) {
+  var ext = (filename.split('.').pop() || '').toLowerCase();
+  if (ext === 'md') return '\uD83D\uDCDD';
+  if (ext === 'json') return '\uD83D\uDCCB';
+  if (ext === 'js' || ext === 'ts' || ext === 'jsx' || ext === 'tsx') return '\uD83D\uDCBB';
+  if (ext === 'css' || ext === 'html' || ext === 'htm') return '\uD83C\uDFA8';
+  if (ext === 'py') return '\uD83D\uDC0D';
+  return '\uD83D\uDCC4';
+}
+
+function toggleFileTree() {
+  fileTreeOpen = !fileTreeOpen;
+  var content = document.getElementById('fileTreeContent');
+  var arrow = document.getElementById('fileTreeArrow');
+  if (!content || !arrow) return;
+  if (fileTreeOpen) {
+    arrow.classList.add('open');
+    content.style.display = '';
+    loadFileTree();
+    startFileTreePolling();
+  } else {
+    arrow.classList.remove('open');
+    content.style.display = 'none';
+    stopFileTreePolling();
+  }
+}
+
+function toggleFileGroup(groupName) {
+  fileGroupState[groupName] = !fileGroupState[groupName];
+  var items = document.getElementById('fg-' + groupName);
+  var arrow = document.getElementById('fga-' + groupName);
+  if (items) items.style.display = fileGroupState[groupName] ? 'none' : '';
+  if (arrow) {
+    if (fileGroupState[groupName]) arrow.classList.remove('open');
+    else arrow.classList.add('open');
+  }
+}
+
+function loadFileTree() {
+  var id = getProjectId();
+  if (!id) {
+    renderFileTree([]);
+    return;
+  }
+  fetch('/api/files/' + encodeURIComponent(id)).then(function(r) {
+    if (!r.ok) throw new Error('Fehler');
+    return r.json();
+  }).then(function(files) {
+    renderFileTree(files);
+  }).catch(function() {
+    renderFileTree([]);
+  });
+}
+
+function renderFileTree(files) {
+  var container = document.getElementById('fileTreeContent');
+  if (!container) return;
+
+  if (!files || files.length === 0) {
+    container.innerHTML = '<div class="file-tree-empty">Noch keine Dateien vorhanden.</div>';
+    return;
+  }
+
+  // Group files by first directory component
+  var groups = {};
+  var rootFiles = [];
+  files.forEach(function(f) {
+    var p = f.path || f;
+    var size = f.size || 0;
+    var parts = p.split('/');
+    if (parts.length > 1) {
+      var group = parts[0];
+      if (!groups[group]) groups[group] = [];
+      groups[group].push({ path: parts.slice(1).join('/'), size: size });
+    } else {
+      rootFiles.push({ path: p, size: size });
+    }
+  });
+
+  var html = '';
+  var groupNames = Object.keys(groups).sort();
+
+  groupNames.forEach(function(name) {
+    var items = groups[name];
+    var collapsed = fileGroupState[name] || false;
+    html += '<div class="file-group">' +
+      '<button class="file-group-header" onclick="toggleFileGroup(\'' + esc(name) + '\')">' +
+        '<span class="arrow' + (collapsed ? '' : ' open') + '" id="fga-' + esc(name) + '">\u25B6</span> ' +
+        '\uD83D\uDCC1 ' + esc(name) +
+        '<span class="file-group-count">' + esc(String(items.length)) + ' Datei' + (items.length !== 1 ? 'en' : '') + '</span>' +
+      '</button>' +
+      '<div class="file-group-items" id="fg-' + esc(name) + '"' + (collapsed ? ' style="display:none"' : '') + '>';
+    items.forEach(function(f) {
+      html += '<div class="file-item">' +
+        '<span class="file-icon">' + fileIcon(f.path) + '</span>' +
+        '<span class="file-name" title="' + esc(f.path) + '">' + esc(f.path) + '</span>' +
+        '<span class="file-size">' + esc(formatFileSize(f.size)) + '</span>' +
+      '</div>';
+    });
+    html += '</div></div>';
+  });
+
+  // Root-level files
+  if (rootFiles.length > 0) {
+    rootFiles.forEach(function(f) {
+      html += '<div class="file-item">' +
+        '<span class="file-icon">' + fileIcon(f.path) + '</span>' +
+        '<span class="file-name" title="' + esc(f.path) + '">' + esc(f.path) + '</span>' +
+        '<span class="file-size">' + esc(formatFileSize(f.size)) + '</span>' +
+      '</div>';
+    });
+  }
+
+  container.innerHTML = html;
+}
+
+function startFileTreePolling() {
+  stopFileTreePolling();
+  if (state.phase === 'running' || state.phase === 'complete') {
+    fileTreeTimer = setInterval(function() {
+      if (fileTreeOpen) loadFileTree();
+      if (state.phase !== 'running') stopFileTreePolling();
+    }, 5000);
+  }
+}
+
+function stopFileTreePolling() {
+  if (fileTreeTimer) { clearInterval(fileTreeTimer); fileTreeTimer = null; }
+}
+
 // ── Init ─────────────────────────────────────────────────────
 connect();
+loadTemplates();
 render();
 </script>
 </body>
