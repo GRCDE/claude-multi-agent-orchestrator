@@ -13,6 +13,8 @@ const { createRetryStrategy, validateConfig: validateRetryConfig, STRATEGIES: RE
 const ConfigProfileManager = require('./src/config-profiles');
 const SnapshotManager = require('./src/snapshot-manager');
 const HealthMonitor = require('./src/health-monitor');
+const { detectSDK, runClaudeSDK, isSDKAvailable, getSDKInfo } = require('./src/claude-sdk');
+const GitIntegration = require('./src/git-integration');
 
 const PROJECTS_DIR = path.join(__dirname, 'projects');
 const PROFILES_DIR = path.join(__dirname, 'profiles');
@@ -41,6 +43,14 @@ const CONFIG = {
   autoInterventionRounds: parseInt(process.env.AUTO_INTERVENTION_ROUNDS) || 10,
   // Merge-Konfiguration: 'latest' | 'largest' | 'manual'
   mergeStrategy: process.env.MERGE_STRATEGY || 'latest',
+  claudeMode: process.env.CLAUDE_MODE || 'cli', // 'cli' | 'sdk' | 'auto'
+  // Git-Integration Konfiguration
+  gitEnabled: process.env.GIT_ENABLED === 'true',
+  gitWorkDir: process.env.GIT_WORK_DIR || '',
+  gitAutoCommit: process.env.GIT_AUTO_COMMIT !== 'false',
+  gitBranchPerProject: process.env.GIT_BRANCH_PER_PROJECT !== 'false',
+  gitAutoPush: process.env.GIT_AUTO_PUSH === 'true',
+  gitCommitPrefix: process.env.GIT_COMMIT_PREFIX || '[orchestrator]',
   language: process.env.LANGUAGE || 'de',
   // Retry-Strategie Konfiguration
   retryStrategy: {
@@ -252,9 +262,117 @@ function checkClaudeCli() {
   }
 }
 
+// ── SDK-Verfügbarkeit prüfen (async) ─────────────────────────
+async function checkClaudeSDK() {
+  try {
+    const available = await detectSDK();
+    const info = getSDKInfo();
+    return {
+      ok: available,
+      available,
+      version: info.version,
+      message: available
+        ? `Claude Code SDK verfügbar (Version: ${info.version || 'unbekannt'})`
+        : 'Claude Code SDK nicht installiert. Installation: npm install @anthropic-ai/claude-code'
+    };
+  } catch (e) {
+    return { ok: false, available: false, error: e.message };
+  }
+}
+
+// ── Run Claude via SDK (mit Streaming + Timeout + Abort) ──
+async function _runClaudeSDKWrapper(prompt, workDir, emitter, activeProcesses, signal, opts = {}) {
+  const effectiveTimeout = opts.timeout || CONFIG.timeout;
+
+  // Abort-Check
+  if (signal && signal.aborted) {
+    throw new Error('Abgebrochen');
+  }
+
+  // AbortController der an SDK weitergereicht wird
+  const sdkController = new AbortController();
+
+  // Signal-Weiterleitung
+  const onAbort = () => sdkController.abort();
+  if (signal) {
+    if (signal.aborted) throw new Error('Abgebrochen');
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  // Streaming-Callback
+  const onStreamChunk = (chunk) => {
+    if (emitter && emitter._streamingAgentIdx !== undefined) {
+      const agentIdx = emitter._streamingAgentIdx;
+      if (emitter.agents && emitter.agents[agentIdx]) {
+        const prev = emitter.agents[agentIdx].liveOutput || '';
+        emitter.agents[agentIdx].liveOutput = (prev + chunk).slice(-2000);
+      }
+      if (!emitter._streamThrottleTimer) {
+        emitter._streamThrottleTimer = setTimeout(() => {
+          emitter._streamThrottleTimer = null;
+          const liveText = (emitter.agents && emitter.agents[agentIdx])
+            ? emitter.agents[agentIdx].liveOutput || ''
+            : chunk;
+          emitter.emit('agent_stream', { index: agentIdx, chunk: liveText.slice(-2000) });
+        }, 500);
+      }
+    }
+  };
+
+  try {
+    const result = await runClaudeSDK(prompt, workDir, {
+      abortController: sdkController,
+      timeout: effectiveTimeout,
+      onStreamChunk,
+    });
+
+    if (signal) signal.removeEventListener('abort', onAbort);
+
+    if (!result.text) {
+      throw new Error('SDK: Leere Antwort von Claude');
+    }
+
+    // SDK liefert strukturierte Token-Usage - als Metadaten anhängen
+    if (result.usage && (result.usage.inputTokens > 0 || result.usage.outputTokens > 0)) {
+      // Metadaten am Rückgabe-String anhängen (unsichtbar für Verarbeitung)
+      const text = result.text;
+      text._sdkUsage = result.usage;
+      // Da Strings keine Properties halten, stattdessen globales Caching
+      if (!global._lastSDKUsage) global._lastSDKUsage = new Map();
+      global._lastSDKUsage.set(prompt.slice(0, 100), result.usage);
+    }
+
+    return result.text;
+  } catch (e) {
+    if (signal) signal.removeEventListener('abort', onAbort);
+
+    // Rate-Limit/Netzwerk-Fehler Erkennung auch bei SDK
+    const errMsg = e.message || '';
+    if (isRateLimited(errMsg) || isNetworkError(errMsg)) {
+      logger.warn('SDK: Rate-Limit/Netzwerkfehler, Fallback auf CLI', { error: errMsg.slice(0, 200) });
+      // Fallback auf CLI bei Netzwerkfehlern
+      return _runClaudeWithRetry(prompt, workDir, emitter, activeProcesses, signal, 0, opts);
+    }
+
+    if (sdkController.signal.aborted) {
+      throw new Error('Abgebrochen');
+    }
+
+    throw e;
+  }
+}
+
 // ── Run claude CLI (mit Rate-Limit Retry + Timeout + Process-Tracking) ──
 // opts.timeout: optionaler Timeout in ms (überschreibt CONFIG.timeout)
-function runClaude(prompt, workDir, emitter, activeProcesses, signal, opts = {}) {
+async function runClaude(prompt, workDir, emitter, activeProcesses, signal, opts = {}) {
+  const mode = CONFIG.claudeMode || 'cli';
+
+  // SDK-Modus: Verwende die native SDK statt CLI-Spawning
+  if (mode === 'sdk' || (mode === 'auto' && isSDKAvailable() === true)) {
+    return _runClaudeSDKWrapper(prompt, workDir, emitter, activeProcesses, signal, opts);
+  }
+
+  // CLI-Modus (Standard): Verwende CLI-Prozess-Spawning
   return _runClaudeWithRetry(prompt, workDir, emitter, activeProcesses, signal, 0, opts);
 }
 
@@ -667,6 +785,15 @@ class Orchestrator extends EventEmitter {
       this.emit('status_changed', data);
     });
     this.healthMonitor.start();
+    // Git-Integration
+    this.gitIntegration = new GitIntegration({
+      enabled: CONFIG.gitEnabled,
+      workDir: CONFIG.gitWorkDir,
+      autoCommit: CONFIG.gitAutoCommit,
+      branchPerProject: CONFIG.gitBranchPerProject,
+      autoPush: CONFIG.gitAutoPush,
+      commitPrefix: CONFIG.gitCommitPrefix,
+    });
     this.reset();
   }
 
@@ -2415,6 +2542,21 @@ Antworte NUR mit validem JSON:
       };
       this._lastMergeResult = mergeResult;
 
+      // Git Auto-Commit: Projekt-Ergebnisse committen
+      if (this.gitIntegration && this.gitIntegration.enabled && this.gitIntegration.autoCommit) {
+        try {
+          const gitResult = await this.gitIntegration.commitProjectResults(
+            this.projectId, this.projectTitle, mergedDir, this.agents
+          );
+          if (gitResult.ok) {
+            this._logActivity('git_commit', { hash: gitResult.hash, branch: gitResult.branch, files: mergedFiles.length });
+            this.emit('git_commit', { hash: gitResult.hash, branch: gitResult.branch, projectId: this.projectId });
+          }
+        } catch (e) {
+          logger.warn('Git Auto-Commit fehlgeschlagen', { error: e.message });
+        }
+      }
+
       logger.info('Merge abgeschlossen', { files: mergedFiles.length, conflicts: conflicts.length, strategy: mergeStrategy, duration: mergeDuration, dir: mergedDir });
       this.emit('merge-complete', { totalFiles: mergedFiles.length, conflicts: conflicts.length, strategy: mergeStrategy, duration: mergeDuration });
       // Abwärtskompatibilität: altes Event auch senden
@@ -3350,6 +3492,10 @@ Orchestrator.prototype.getConfig = function() {
     language: CONFIG.language,
     retryStrategy: _activeRetryStrategy.toJSON(),
     activeProfile: this.profileManager ? this.profileManager.getActiveProfile() : null,
+    claudeMode: CONFIG.claudeMode,
+    sdkAvailable: isSDKAvailable(),
+    sdkInfo: getSDKInfo(),
+    git: this.gitIntegration ? this.gitIntegration.getConfig() : null,
   };
 };
 
@@ -3382,6 +3528,7 @@ Orchestrator.prototype.updateConfig = function(patch, _skipHistory) {
   };
 
   const VALID_ISOLATION_MODES = ['shared', 'strict'];
+  const VALID_CLAUDE_MODES = ['cli', 'sdk', 'auto'];
 
   const errors = [];
   const VALID_LANGUAGES = Object.keys(LANGUAGES);
@@ -3428,6 +3575,26 @@ Orchestrator.prototype.updateConfig = function(patch, _skipHistory) {
         errors.push(`isolation muss 'shared' oder 'strict' sein`);
       } else {
         CONFIG.isolation = val;
+      }
+      continue;
+    }
+    if (field === 'claudeMode') {
+      if (VALID_CLAUDE_MODES.includes(val)) {
+        CONFIG.claudeMode = val;
+        logger.info('Claude-Modus geändert', { mode: val });
+        // Bei SDK/Auto-Modus: SDK-Verfügbarkeit prüfen
+        if (val === 'sdk' || val === 'auto') {
+          detectSDK().catch(() => {});
+        }
+      } else {
+        errors.push(`Ungültiger Claude-Modus: ${val}. Erlaubt: ${VALID_CLAUDE_MODES.join(', ')}`);
+      }
+      continue;
+    }
+    if (field === 'git' && typeof val === 'object' && val !== null) {
+      if (this.gitIntegration) {
+        const gitErrors = this.gitIntegration.updateConfig(val);
+        if (gitErrors.length > 0) errors.push(...gitErrors);
       }
       continue;
     }
@@ -4250,4 +4417,5 @@ Orchestrator.prototype._autoSnapshot = async function(trigger) {
   }
 };
 
+Orchestrator.checkClaudeSDK = checkClaudeSDK;
 module.exports = Orchestrator;

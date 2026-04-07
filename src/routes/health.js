@@ -27,11 +27,17 @@ function init(deps) {
 
   // ── Health-Check (beide Pfade: /health und /api/health) ─────
   function healthHandler(req, res) {
+    const config = orchestrator.getConfig();
     res.json({
       status: 'ok',
       uptime: Math.round(process.uptime()),
       phase: orchestrator.phase,
-      memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
+      memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+      sdk: {
+        mode: config.claudeMode || 'cli',
+        available: config.sdkAvailable,
+        info: config.sdkInfo || {},
+      }
     });
   }
   router.get('/health', healthHandler);
@@ -48,6 +54,15 @@ function init(deps) {
       websocket: wsClients.size,
     });
     const health = orchestrator.healthMonitor.getHealth();
+    const config = orchestrator.getConfig();
+
+    // Add SDK info to detailed health response
+    health.sdk = {
+      mode: config.claudeMode || 'cli',
+      available: config.sdkAvailable,
+      info: config.sdkInfo || {},
+    };
+
     res.json(health);
   });
 

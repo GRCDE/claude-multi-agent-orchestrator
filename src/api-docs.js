@@ -88,7 +88,7 @@ function generateApiDocs() {
           path: '/api/health',
           description: 'Health-Check (API-Pfad)',
           parameters: {},
-          responses: { 200: '{ status: "ok", uptime, phase, memory }' },
+          responses: { 200: '{ status: "ok", uptime, phase, memory, sdk: { mode, available, info } }' },
           example: 'GET /api/health'
         }
       ],
@@ -140,16 +140,16 @@ function generateApiDocs() {
           path: '/api/config',
           description: 'Aktuelle Orchestrator-Konfiguration abrufen',
           parameters: {},
-          responses: { 200: 'Konfigurations-Objekt' },
+          responses: { 200: 'Konfigurations-Objekt mit claudeMode, sdkAvailable, sdkInfo Feldern' },
           example: 'GET /api/config'
         },
         {
           method: 'POST',
           path: '/api/config',
           description: 'Orchestrator-Konfiguration aktualisieren',
-          parameters: { body: { '...': 'Konfigurationsfelder die aktualisiert werden sollen' } },
+          parameters: { body: { '...': 'Konfigurationsfelder die aktualisiert werden sollen', claudeMode: 'string - "cli" | "sdk" | "auto"', sdkAvailable: 'boolean|null - Ob Claude Code SDK installiert ist' } },
           responses: { 200: '{ ok: true, config }', 400: 'Validierungsfehler' },
-          example: 'POST /api/config { "agentTimeout": 180 }'
+          example: 'POST /api/config { "agentTimeout": 180, "claudeMode": "sdk" }'
         },
         {
           method: 'GET',
@@ -797,6 +797,129 @@ function generateApiDocs() {
             409: 'Warteschlange voll'
           },
           example: 'POST /api/start-milestone { "milestoneId": "m1" }'
+        }
+      ],
+
+      Git: [
+        {
+          method: 'GET',
+          path: '/api/git/status',
+          description: 'Git-Status und Konfiguration abfragen',
+          parameters: {},
+          responses: { 200: '{ ok: true, config: { enabled, workDir, ... }, status: { branch, clean, modified, added, deleted } }' },
+          example: 'GET /api/git/status'
+        },
+        {
+          method: 'GET',
+          path: '/api/git/log',
+          description: 'Git-Log (letzte Commits) abfragen',
+          parameters: {
+            query: {
+              count: 'number - Anzahl Commits (max 100, Standard: 20)'
+            }
+          },
+          responses: { 200: '{ ok: true, commits: [{ hash, shortHash, message, author, date }], branch }' },
+          example: 'GET /api/git/log?count=10'
+        },
+        {
+          method: 'GET',
+          path: '/api/git/branches',
+          description: 'Git-Branches auflisten',
+          parameters: {},
+          responses: { 200: '{ ok: true, branches: [{ name, current }], current }' },
+          example: 'GET /api/git/branches'
+        },
+        {
+          method: 'GET',
+          path: '/api/git/diff/:hash',
+          description: 'Diff fuer einen bestimmten Commit anzeigen',
+          parameters: {
+            params: {
+              hash: 'string - Commit-Hash'
+            }
+          },
+          responses: { 200: '{ ok: true, diff, hash }' },
+          example: 'GET /api/git/diff/abc123'
+        },
+        {
+          method: 'GET',
+          path: '/api/git/config',
+          description: 'Git-Integration Konfiguration lesen',
+          parameters: {},
+          responses: { 200: '{ ok: true, enabled, workDir, autoCommit, branchPerProject, autoPush, isRepo, gitInstalled }' },
+          example: 'GET /api/git/config'
+        },
+        {
+          method: 'POST',
+          path: '/api/git/config',
+          description: 'Git-Integration Konfiguration aendern',
+          parameters: {
+            body: {
+              enabled: 'boolean - Git-Integration aktivieren/deaktivieren',
+              workDir: 'string - Absoluter Pfad zum Work-Dir',
+              autoCommit: 'boolean - Auto-Commit nach Projekt-Ende',
+              branchPerProject: 'boolean - Separate Branch pro Projekt',
+              autoPush: 'boolean - Auto-Push nach Commit'
+            }
+          },
+          responses: { 200: '{ ok: true, enabled, workDir, ... }', 400: 'Validierungsfehler' },
+          example: 'POST /api/git/config { "enabled": true, "autoCommit": true }'
+        },
+        {
+          method: 'POST',
+          path: '/api/git/commit',
+          description: 'Manuellen Git-Commit erstellen',
+          parameters: {
+            body: {
+              message: 'string - Commit-Nachricht'
+            }
+          },
+          responses: { 200: '{ ok: true, hash, message }', 400: 'Validierungsfehler' },
+          example: 'POST /api/git/commit { "message": "Phase 15: New features" }'
+        },
+        {
+          method: 'POST',
+          path: '/api/git/push',
+          description: 'Zum Remote pushen',
+          parameters: {},
+          responses: { 200: '{ ok: true, branch }', 400: 'Git-Fehler' },
+          example: 'POST /api/git/push'
+        },
+        {
+          method: 'POST',
+          path: '/api/git/checkout',
+          description: 'Branch wechseln',
+          parameters: {
+            body: {
+              branch: 'string - Branch-Name'
+            }
+          },
+          responses: { 200: '{ ok: true, branch }', 400: 'Branch nicht gefunden oder Fehler' },
+          example: 'POST /api/git/checkout { "branch": "feature/new-api" }'
+        },
+        {
+          method: 'POST',
+          path: '/api/git/init',
+          description: 'Git-Repository initialisieren',
+          parameters: {
+            body: {
+              dir: 'string - Optionaler Pfad (sonst workDir aus Config)'
+            }
+          },
+          responses: { 200: '{ ok: true, message }', 400: 'Fehler beim Init' },
+          example: 'POST /api/git/init { "dir": "/path/to/repo" }'
+        },
+        {
+          method: 'POST',
+          path: '/api/git/commit-project/:id',
+          description: 'Projekt-Ergebnisse manuell committen',
+          parameters: {
+            params: {
+              id: 'string - Projekt-ID'
+            }
+          },
+          responses: { 200: '{ ok: true, hash, branch, steps }', 404: 'Projekt nicht gefunden', 400: 'Git-Fehler' },
+          example: 'POST /api/git/commit-project/proj-123'
         }
       ],
 

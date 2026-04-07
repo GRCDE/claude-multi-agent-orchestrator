@@ -3547,6 +3547,12 @@ registerEventHandler('budget_exceeded', function(d) {
     updateBudgetDisplay();
   });
 
+registerEventHandler('git_commit', function(d) {
+    if (d && d.hash) {
+      showToast('Git-Commit: ' + d.hash + (d.branch ? ' (' + d.branch + ')' : ''), 'success');
+    }
+  });
+
 function applyState(s) {
   state.phase = s.phase || 'idle';
   state.coordinator = s.coordinator || state.coordinator;
@@ -9435,6 +9441,61 @@ function openSettings() {
       '</div>';
     }
 
+    // ── Claude-Modus Einstellung ──
+    fieldsHtml += '<div style="border-top:1px solid var(--border);margin:16px 0 12px;padding-top:14px">' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:10px">Claude-Modus</div>' +
+      '<div class="settings-field">' +
+        '<label for="cfg_claudeMode">Ausf\u00FChrungsmodus</label>' +
+        '<select id="cfg_claudeMode" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--txt);font-size:13px">' +
+          '<option value="cli"' + (cfg.claudeMode === 'cli' ? ' selected' : '') + '>CLI (Standard)</option>' +
+          '<option value="sdk"' + (cfg.claudeMode === 'sdk' ? ' selected' : '') + '>SDK (Native)</option>' +
+          '<option value="auto"' + (cfg.claudeMode === 'auto' ? ' selected' : '') + '>Auto (SDK bevorzugt, CLI Fallback)</option>' +
+        '</select>' +
+        '<div class="hint">CLI: Spawnt claude-Prozesse. SDK: Nutzt @anthropic-ai/claude-code direkt. Auto: SDK wenn verf\u00FCgbar, sonst CLI.</div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--dim);margin-top:4px" id="sdkStatusHint">' +
+        (cfg.sdkAvailable === true ? '\u2705 SDK verf\u00FCgbar' : (cfg.sdkAvailable === false ? '\u274C SDK nicht installiert' : '\u2753 SDK-Status unbekannt')) +
+        (cfg.sdkInfo && cfg.sdkInfo.version ? ' (v' + esc(String(cfg.sdkInfo.version)) + ')' : '') +
+      '</div>' +
+    '</div>';
+
+    // ── Git-Integration Einstellungen ──
+    var gitConfig = cfg.git || {};
+    fieldsHtml += '<div style="border-top:1px solid var(--border);margin:16px 0 12px;padding-top:14px">' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:10px">Git-Integration</div>' +
+      '<div class="settings-field">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
+        '<input type="checkbox" id="cfg_gitEnabled" ' + (gitConfig.enabled ? 'checked' : '') + ' style="accent-color:var(--blue);width:16px;height:16px;cursor:pointer">' +
+        ' Git-Integration aktivieren</label>' +
+        '<div class="hint">Committed Projekt-Ergebnisse automatisch in ein Git-Repository.</div>' +
+      '</div>' +
+      '<div class="settings-field">' +
+        '<label for="cfg_gitWorkDir">Git-Arbeitsverzeichnis</label>' +
+        '<input type="text" id="cfg_gitWorkDir" value="' + esc(gitConfig.workDir || '') + '" placeholder="C:\\\\pfad\\\\zum\\\\repo">' +
+        '<div class="hint">Absoluter Pfad zum Ziel-Git-Repository.</div>' +
+      '</div>' +
+      '<div class="settings-field">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
+        '<input type="checkbox" id="cfg_gitAutoCommit" ' + (gitConfig.autoCommit !== false ? 'checked' : '') + ' style="accent-color:var(--blue);width:16px;height:16px;cursor:pointer">' +
+        ' Auto-Commit nach Merge</label>' +
+      '</div>' +
+      '<div class="settings-field">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
+        '<input type="checkbox" id="cfg_gitBranchPerProject" ' + (gitConfig.branchPerProject !== false ? 'checked' : '') + ' style="accent-color:var(--blue);width:16px;height:16px;cursor:pointer">' +
+        ' Branch pro Projekt</label>' +
+      '</div>' +
+      '<div class="settings-field">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
+        '<input type="checkbox" id="cfg_gitAutoPush" ' + (gitConfig.autoPush ? 'checked' : '') + ' style="accent-color:var(--blue);width:16px;height:16px;cursor:pointer">' +
+        ' Auto-Push nach Commit</label>' +
+        '<div class="hint">Pushed automatisch zum Remote nach jedem Commit.</div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--dim);margin-top:4px">' +
+        (gitConfig.gitInstalled ? '\u2705 Git installiert' : '\u274C Git nicht gefunden') +
+        (gitConfig.isRepo ? ' | \u2705 Repository erkannt' : (gitConfig.workDir ? ' | \u274C Kein Repository' : '')) +
+      '</div>' +
+    '</div>';
+
     fieldsHtml += '<div style="border-top:1px solid var(--border);margin:16px 0 12px;padding-top:14px">' +
       '<div style="font-size:13px;font-weight:600;margin-bottom:10px">Webhook</div>' +
       '<div class="settings-field">' +
@@ -9936,6 +9997,26 @@ function saveSettings() {
   }
   var webhookInput = document.getElementById('cfg_webhookUrl');
   if (webhookInput) payload.webhookUrl = webhookInput.value.trim();
+
+  // Claude-Modus speichern
+  var claudeModeSelect = document.getElementById('cfg_claudeMode');
+  if (claudeModeSelect) payload.claudeMode = claudeModeSelect.value;
+
+  // Git-Integration Einstellungen
+  var gitEnabledCheck = document.getElementById('cfg_gitEnabled');
+  var gitWorkDirInput = document.getElementById('cfg_gitWorkDir');
+  var gitAutoCommitCheck = document.getElementById('cfg_gitAutoCommit');
+  var gitBranchCheck = document.getElementById('cfg_gitBranchPerProject');
+  var gitAutoPushCheck = document.getElementById('cfg_gitAutoPush');
+  if (gitEnabledCheck) {
+    payload.git = {
+      enabled: gitEnabledCheck.checked,
+      workDir: gitWorkDirInput ? gitWorkDirInput.value.trim() : '',
+      autoCommit: gitAutoCommitCheck ? gitAutoCommitCheck.checked : true,
+      branchPerProject: gitBranchCheck ? gitBranchCheck.checked : true,
+      autoPush: gitAutoPushCheck ? gitAutoPushCheck.checked : false,
+    };
+  }
 
   // Retry-Strategie separat speichern
   var retryStrategySelect = document.getElementById('cfg_retryStrategy');

@@ -18,6 +18,7 @@ const { router: agentsRouter, init: initAgents } = require('./src/routes/agents'
 const { router: queueRouter, init: initQueue, projectQueue, MAX_QUEUE_SIZE, sortQueueByPriority, broadcastQueueUpdate, validateStartInput } = require('./src/routes/queue');
 const { router: configRouter, init: initConfig } = require('./src/routes/config');
 const { router: filesRouter, init: initFiles } = require('./src/routes/files');
+const { router: gitRouter, init: initGit } = require('./src/routes/git');
 
 const compression = require('compression');
 const orchestrator = new Orchestrator();
@@ -543,6 +544,10 @@ app.use(healthRouter);
 // ── Files/Docs/i18n/Roles/Batch-Router initialisieren und mounten ───
 initFiles({ orchestrator, logger, authMiddleware, apiLimiter, apiReadLimiter, app, PORT });
 app.use('/api', filesRouter);
+
+// ── Git-Router initialisieren und mounten ──────────────────
+initGit({ orchestrator, logger, broadcast, authMiddleware, apiLimiter, apiReadLimiter });
+app.use('/api', gitRouter);
 
 // ── Projekt-Historie ─────────────────────────────────────────
 

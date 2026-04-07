@@ -119,6 +119,22 @@ const translations = {
     'misc.transcript_no_space': 'Warnung: Kein Speicherplatz für Transcript',
     'misc.history_trimmed': '... gekürzt ...',
     'misc.auto_retry': 'Auto-Retry in {seconds}s',
+
+    // SDK
+    'sdk.not_available': 'Claude Code SDK nicht verfügbar. CLI-Modus wird verwendet.',
+    'sdk.detected': 'Claude Code SDK erkannt (Version: {version})',
+    'sdk.mode_changed': 'Claude-Modus geändert: {mode}',
+    'sdk.invalid_mode': 'Ungültiger Claude-Modus: {mode}. Erlaubt: cli, sdk, auto',
+    'sdk.fallback_cli': 'SDK-Fehler, Fallback auf CLI-Modus',
+
+    // Git
+    'git.commit_success': 'Git-Commit erstellt: {hash}',
+    'git.commit_failed': 'Git-Commit fehlgeschlagen: {error}',
+    'git.push_success': 'Git-Push erfolgreich: {branch}',
+    'git.push_failed': 'Git-Push fehlgeschlagen: {error}',
+    'git.branch_created': 'Git-Branch erstellt: {branch}',
+    'git.not_configured': 'Git-Integration nicht konfiguriert',
+    'git.disabled': 'Git-Integration deaktiviert',
   },
 
   en: {
@@ -227,6 +243,22 @@ const translations = {
     'misc.transcript_no_space': 'Warning: No disk space for transcript',
     'misc.history_trimmed': '... trimmed ...',
     'misc.auto_retry': 'Auto-retry in {seconds}s',
+
+    // SDK
+    'sdk.not_available': 'Claude Code SDK not available. Using CLI mode.',
+    'sdk.detected': 'Claude Code SDK detected (Version: {version})',
+    'sdk.mode_changed': 'Claude mode changed: {mode}',
+    'sdk.invalid_mode': 'Invalid Claude mode: {mode}. Allowed: cli, sdk, auto',
+    'sdk.fallback_cli': 'SDK error, falling back to CLI mode',
+
+    // Git
+    'git.commit_success': 'Git commit created: {hash}',
+    'git.commit_failed': 'Git commit failed: {error}',
+    'git.push_success': 'Git push successful: {branch}',
+    'git.push_failed': 'Git push failed: {error}',
+    'git.branch_created': 'Git branch created: {branch}',
+    'git.not_configured': 'Git integration not configured',
+    'git.disabled': 'Git integration disabled',
   },
 };
 

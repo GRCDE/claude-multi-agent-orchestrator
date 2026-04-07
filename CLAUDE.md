@@ -1,4 +1,4 @@
-# Claude Multi-Agent Orchestrator v4.1
+# Claude Multi-Agent Orchestrator v4.2
 
 ## Ueberblick
 
@@ -21,16 +21,16 @@ Express Server (server.js) ~2455 Zeilen + src/routes/ ~3640 Zeilen
     - Compression (gzip), Input-Sanitierung
     - SSE Broadcast mit Event-Batching (100ms)
     - WebSocket Server (Dual-Mode: WS + SSE Fallback)
-    - REST API (123 Endpoints) + SSE + WebSocket
+    - REST API (134 Endpoints) + SSE + WebSocket
     - Performance-Metriken (CPU, Memory, Endpoint-Statistiken)
     - Project Queue mit Auto-Dequeue + Prioritaeten
     - Webhook-Dispatching (Event-basiert, HMAC-SHA256 Signatur)
     - Crash-Recovery (Checkpoint-basiert)
     - Projektuebergreifende Volltextsuche
     - Async File I/O (komplett, 0 sync fs-Aufrufe)
-    - Modulare Route-Handler in src/routes/ (11 Module)
+    - Modulare Route-Handler in src/routes/ (12 Module)
     v
-src/routes/ (11 Module)
+src/routes/ (12 Module)
     - agents.js      Projekt-Steuerung (Start, Abort, Approve, Retry, Intervene, Resume)
     - analytics.js   Metriken, Stats, Analytics, Suche
     - config.js      Config, Prompts, Budget, Undo/Redo
@@ -76,6 +76,8 @@ Dateisystem (projects/{id}/agent-{n}/)
 
 ## Neue Features seit v4.0
 
+- **Claude Code SDK Integration**: Dual-Modus (CLI/SDK/Auto) fuer Claude-Ausfuehrung. SDK-Modus nutzt @anthropic-ai/claude-code direkt statt CLI-Spawning. Bessere Performance, strukturierte Token-Usage, automatischer Fallback. Konfigurierbar per CLAUDE_MODE ENV oder Config-API.
+- **Git-Integration**: Auto-Commit von Projekt-Ergebnissen in Git-Repository. Branch pro Projekt, Auto-Push, konfigurierbares Commit-Prefix. 11 neue Git-API-Endpoints. Konfigurierbar per ENV oder Config-API/UI.
 - **Performance-Metriken API**: CPU-Auslastung, Memory, Endpoint-Statistiken mit Timing (GET /api/metrics).
 - **Differenziertes Rate-Limiting**: Separate Limits fuer Reads (120/min), Mutations (30/min), Starts (3/min), Exports (10/min). Custom Key-Generator mit IP + Token.
 - **SSE-Verbindungslimit pro IP**: Max 5 SSE-Verbindungen pro IP-Adresse, zusaetzlich zum globalen Limit (50).
@@ -121,7 +123,7 @@ Dateisystem (projects/{id}/agent-{n}/)
 - **Toast-Benachrichtigungen**: Nicht-blockierende Toast-Meldungen im Frontend fuer Aktionen und Tastenkuerzel.
 - **Nicht-Stoeren-Modus**: Temporaerer DnD-Modus -- unterdrueckt Sound- und Desktop-Notifications.
 - **Clipboard-Kopieren**: Projekt-ID, Texte und Code-Bloecke per Klick kopieren (Clipboard API).
-- **Modulare Route-Architektur**: Server-Routen aufgeteilt in 11 Module unter src/routes/ (agents, analytics, config, exports, files, health, projects, queue, snapshots, templates, webhooks).
+- **Modulare Route-Architektur**: Server-Routen aufgeteilt in 12 Module unter src/routes/ (agents, analytics, config, exports, files, git, health, projects, queue, snapshots, templates, webhooks).
 
 ## API-Referenz
 
@@ -373,6 +375,22 @@ Dateisystem (projects/{id}/agent-{n}/)
 | GET | `/api/search/logs` | Log-Suche |
 | POST | `/api/search/reindex` | Such-Index neu aufbauen |
 
+### Git-Integration
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/git/status` | Git-Status und Konfiguration |
+| GET | `/api/git/log` | Git-Log (letzte Commits, ?count=N) |
+| GET | `/api/git/branches` | Branches auflisten |
+| GET | `/api/git/diff/:hash` | Diff fuer einen Commit |
+| GET | `/api/git/config` | Git-Konfiguration lesen |
+| POST | `/api/git/config` | Git-Konfiguration aendern |
+| POST | `/api/git/commit` | Manueller Commit |
+| POST | `/api/git/push` | Push zum Remote |
+| POST | `/api/git/checkout` | Branch wechseln |
+| POST | `/api/git/init` | Repository initialisieren |
+| POST | `/api/git/commit-project/:id` | Projekt-Ergebnisse committen |
+
 ### SSE + WebSocket
 
 | Pfad | Beschreibung |
@@ -380,7 +398,7 @@ Dateisystem (projects/{id}/agent-{n}/)
 | GET `/api/stream` | SSE-Endpoint (Auto-Reconnect via Last-Event-ID, max 50 Clients, 5 pro IP) |
 | `/ws` | WebSocket-Endpoint (Upgrade-Handler, Heartbeat, Event-Subscription) |
 
-**Gesamt: 125 Endpoints** (123 REST + SSE + WebSocket)
+**Gesamt: 136 Endpoints** (134 REST + SSE + WebSocket)
 
 ## SSE-Events
 
@@ -420,6 +438,7 @@ Alle Events werden sowohl ueber SSE (`/api/stream`) als auch WebSocket (`/ws`) g
 | `budget_exceeded` | Token-Budget ueberschritten |
 | `reconnect_recovery` | SSE Reconnect: verpasste Events nachgeliefert |
 | `subscribed` | WebSocket: Event-Subscription bestaetigt |
+| `git_commit` | Git-Commit erstellt (Hash, Branch, Projekt-ID) |
 | `error` | Fehlermeldung |
 
 ## WebSocket-Protokoll
@@ -486,6 +505,13 @@ Wenn `_subscribedEvents` gesetzt ist, werden nur abonnierte Events gesendet.
 | `AUTO_INTERVENTION` | `false` | Auto-Intervention aktivieren |
 | `AUTO_INTERVENTION_ROUNDS` | `10` | Rundenzahl ab der Auto-Intervention warnt |
 | `MERGE_STRATEGY` | `latest` | Merge-Strategie (latest/largest/manual) |
+| `CLAUDE_MODE` | `cli` | Ausfuehrungsmodus: cli (CLI-Spawning), sdk (Native SDK), auto (SDK bevorzugt, CLI Fallback) |
+| `GIT_ENABLED` | `false` | Git-Integration aktivieren |
+| `GIT_WORK_DIR` | – | Absoluter Pfad zum Ziel-Git-Repository |
+| `GIT_AUTO_COMMIT` | `true` | Auto-Commit nach Merge |
+| `GIT_BRANCH_PER_PROJECT` | `true` | Eigener Branch pro Projekt |
+| `GIT_AUTO_PUSH` | `false` | Auto-Push nach Commit |
+| `GIT_COMMIT_PREFIX` | `[orchestrator]` | Prefix fuer Commit-Messages |
 | `LOG_LEVEL` | `info` | Winston Log-Level |
 
 ### Orchestrator-Konstanten
@@ -548,8 +574,11 @@ Multiagents/
 │   │   ├── queue.js       Queue, Meilensteine
 │   │   ├── snapshots.js   Snapshots, Config-Profile
 │   │   ├── templates.js   Templates, Managed Templates
-│   │   └── webhooks.js    Webhooks CRUD + Test
+│   │   ├── webhooks.js    Webhooks CRUD + Test
+│   │   └── git.js         Git-Integration (Status, Log, Commit, Push, Branches)
 │   ├── logger.js          Winston Logger + BufferTransport + Log-Rotation
+│   ├── claude-sdk.js      Claude Code SDK Wrapper (Detection, Fallback, Streaming)
+│   ├── git-integration.js Git-Integration (Commit, Branch, Push, Diff)
 │   ├── api-docs.js        Auto-generierte API-Dokumentation (JSON, OpenAPI, Markdown, Swagger UI)
 │   ├── batch-processor.js Batch-Request-Verarbeitung
 │   ├── config-profiles.js Config-Profil-Management (CRUD, Import/Export)
@@ -584,7 +613,7 @@ Multiagents/
 ├── jest.config.js         Jest-Konfiguration (maxWorkers:1)
 ├── Dockerfile             Docker-Container
 ├── docker-compose.yml     Docker Compose
-├── package.json           v4.1.0
+├── package.json           v4.2.0
 ├── start.bat              Windows-Starter
 ├── README.md              Projekt-README
 ├── GUIDE.md               Benutzerhandbuch
@@ -729,6 +758,26 @@ Oder: `start.bat` doppelklicken (Windows)
 - `trimHistory()` -- Konversations-Historie auf Token-Limit kuerzen
 - `djb2Hash()` -- Schneller String-Hash fuer Delta-Write Erkennung
 - `checkClaudeCli()` -- CLI-Verfuegbarkeit + Versions-Check
+- `_runClaudeSDKWrapper()` -- SDK-basierte Ausfuehrung mit Streaming, Abort, Token-Tracking, CLI-Fallback bei Fehler
+- `checkClaudeSDK()` -- SDK-Verfuegbarkeit async pruefen
+
+### src/claude-sdk.js
+- `detectSDK()` -- Prueft ob @anthropic-ai/claude-code SDK installiert ist (dynamischer Import, gecached)
+- `runClaudeSDK()` -- Fuehrt Prompt via SDK aus (AbortController, Timeout, Streaming-Callback)
+- `isSDKAvailable()` -- Synchroner Check ob SDK verfuegbar (cached, null wenn noch nicht geprueft)
+- `getSDKInfo()` -- SDK-Versionsinformationen abrufen
+
+### src/git-integration.js (Klasse `GitIntegration`)
+- `checkGit()` -- Git-Verfuegbarkeit pruefen
+- `initRepo()` -- Git-Repository initialisieren
+- `createProjectBranch()` -- Projekt-Branch erstellen und wechseln
+- `copyMergedFiles()` -- Merged-Dateien ins Git-Verzeichnis kopieren
+- `commit()` -- Stage + Commit erstellen
+- `push()` -- Zum Remote pushen
+- `getStatus()` -- Git-Status abfragen
+- `getLog()` -- Commit-Historie abfragen
+- `getCommitDiff()` -- Diff fuer einen Commit
+- `commitProjectResults()` -- Vollstaendiger Git-Workflow (Branch -> Copy -> Commit -> Push)
 
 ### server.js
 
@@ -749,7 +798,7 @@ Oder: `start.bat` doppelklicken (Windows)
 - Webhook-Dispatching mit HMAC-SHA256 Signatur und Retry
 - Project Queue mit Auto-Dequeue, Prioritaeten und exponential Backoff bei Fehlern
 - Durchschnittliche Projektdauer-Tracking fuer geschaetzte Wartezeiten
-- Modulare Route-Handler in `src/routes/` (11 Module): agents, analytics, config, exports, files, health, projects, queue, snapshots, templates, webhooks
+- Modulare Route-Handler in `src/routes/` (12 Module): agents, analytics, config, exports, files, git, health, projects, queue, snapshots, templates, webhooks
 - Modulare Service-Layer in `src/`: API-Docs, Batch-Processor, Config-Profiles, Health-Monitor, I18n, Log-Search, Retry-Strategies, Snapshot-Manager, Template-Manager
 - Rollen-Management (CRUD) mit Persistierung in roles.json
 - Projekt-Archivierung und Tags
